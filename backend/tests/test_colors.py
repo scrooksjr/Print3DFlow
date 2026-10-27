@@ -251,7 +251,14 @@ def test_preview_is_stored_separately_and_served_without_enabling_quotes(client)
     assert client.post('/api/jobs/'+jid+'/quotes',json=dict(confirmed=True,grams_per_part=1,hours_per_part=1)).status_code == 422
 
 
-def test_custom_finish_is_recorded_but_cannot_be_quoted_as_print_only(client):
+def test_custom_finish_is_recorded_but_cannot_be_quoted_as_print_only(client, monkeypatch):
+    from backend import integrations
+
+    # CI has no imported private profiles. Supply only the public test identity
+    # so comparison validation reaches the finishing gate before any slicing.
+    monkeypatch.setattr(integrations, "profile_definitions", lambda: [
+        dict(id="a1-pla-0.4-v1", printer={"id": "bambu-a1"})
+    ])
     staged = client.post('/api/model-uploads',files={'file':('single.3mf',color_project())}).json()
     j = client.post('/api/jobs',json=dict(title='Painted request',quantity=1,material='PLA',finish='painting',units='mm',model_upload_id=staged['id'],deadline=(datetime.now(timezone.utc)+timedelta(days=3)).isoformat()))
     assert j.status_code == 201 and j.json()['finish'] == 'painting'
