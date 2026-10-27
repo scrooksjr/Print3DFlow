@@ -475,9 +475,15 @@ def run_bambu_slice(mesh: Path, units: str, profile_id: str, workdir: Path):
         str(mesh.resolve()),
     ]
     if profile.get("source") == "bambu_project":
-        from backend.project_profile import write_project
+        from backend.model_processing import build_profile_project
+        from fastapi import HTTPException
 
-        write_project(configs["project"], mesh, units, workdir / "input.3mf")
+        try:
+            build_profile_project(
+                configs["project"], mesh, units, workdir / "input.3mf"
+            )
+        except HTTPException as exc:
+            raise IntegrationError(str(exc.detail)) from None
         command = [
             str(executable),
             "--slice",

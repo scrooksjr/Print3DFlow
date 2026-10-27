@@ -80,9 +80,13 @@ For intake, the request text, date/time context and validated file format, dimen
 
 ### STL and 3MF job uploads
 
+If a model fails the closed-solid check, **Attempt repair on a copy** offers a conservative local repair. It removes degenerate/duplicate triangles, fills small triangular/quadrilateral holes and corrects face winding. It does not rescale or remesh the part. A candidate must pass closed-solid validation and preserve its envelope; complex defects may still require an external repair tool. The original file is not overwritten.
+
+Review before/after metrics and download the repaired STL to inspect its surfaces. Explicitly choose **Use reviewed repaired copy** before Meta intake or job creation can use the candidate. This approves geometry only; price and reservation approval remain separate. Matching dimensions do not guarantee that topology or intended features were preserved. Repair artifacts remain local and expire for use after one hour.
+
 Creating a new job requires a validated model file. The UI stages the upload through `POST /api/model-uploads`, then passes the returned single-use `model_upload_id` to `POST /api/jobs`. Missing, expired, consumed or invalid uploads cannot create a job. Staged uploads expire after one hour; Meta extraction alone remains a draft and creates no job.
 
-Job uploads accept `.stl` and supported `.3mf` geometry (up to 10 MB compressed/input size and 100,000 triangles). STL units require operator confirmation. 3MF embedded units and component/build transforms are converted into millimeter geometry for preview, quoting and independent printer slices. A multi-object build is treated as one assembly; quantity repeats the complete assembly, not each object separately. Review the preview and resulting dimensions before approval.
+Job uploads accept `.stl` and supported `.3mf` geometry (up to 64 MiB input size and 1,000,000 triangles). STL units require operator confirmation. 3MF embedded units and component/build transforms are converted into millimeter geometry for preview, quoting and independent printer slices. A multi-object build is treated as one assembly; quantity repeats the complete assembly, not each object separately. Review the preview and resulting dimensions before approval.
 
 Uploaded 3MF printer/process settings, G-code and scripts are ignored; only the registered, operator-reviewed profile drives slicing. The app retains normalized STL geometry plus source provenance, not the original archive. Modifiers, cyclic or external references, unsupported geometry and archives exceeding inspection limits require manual review. Saving printer settings as a trusted local profile remains a separate importer workflow.
 
@@ -163,7 +167,9 @@ The X2D test also needs your locally imported profile. `scripts/e2e_live.py` exe
 
 React/TypeScript/Vite frontend; FastAPI/SQLAlchemy backend; SQLite by default, with a configurable PostgreSQL connection; local artifact storage; and background slicing tasks. All capacity mutations pass through a serialized shop transaction. The demo uses one API process, not a distributed worker queue.
 
-This is an **unauthenticated loopback-only operator prototype**. It does not synchronize with a printer's real queue, provide customer authorization, send notifications, or control machines. Mesh parsing still needs stronger isolation before accepting untrusted public uploads. A subprocess timeout is not an OS memory/disk sandbox. Recorded comparisons establish agreement with slicer estimates, not physical-print accuracy or production reliability. PostgreSQL integration verification and production hardening remain work ahead.
+Model inspection and imported-profile project generation run one at a time in a separate process with a 90-second deadline and 2 GiB OS memory limit. Repair has a separate 250,000-triangle cap and 45-second deadline. 3MF archives are limited to 256 entries, 128 MiB total expanded data and 96 MiB per part; geometry is capped at 1,500,000 vertices per mesh. Uploads stream through temporary disk buffers that are removed after completion or failure. Concurrent processing returns a retry response. No model is automatically simplified. Native Bambu slicing retains its separate 120-second timeout.
+
+This is an **unauthenticated loopback-only operator prototype**. It does not synchronize with a printer's real queue, provide customer authorization, send notifications, or control machines. The geometry worker has memory and time bounds, but it is not a filesystem/network security sandbox. Untrusted public hosting still requires stronger isolation and aggregate storage quotas. Recorded comparisons establish agreement with slicer estimates, not physical-print accuracy or production reliability. PostgreSQL integration verification and production hardening remain work ahead.
 
 ## Public and local files
 

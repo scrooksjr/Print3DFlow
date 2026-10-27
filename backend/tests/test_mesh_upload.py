@@ -66,3 +66,24 @@ def test_bad_3mf_does_not_change_job(client, content):
         == 422
     )
     assert client.get("/api/state").json()["jobs"] == before
+
+
+def test_triangle_limit_error_identifies_actual_count(client, monkeypatch):
+    from backend import mesh_upload
+
+    monkeypatch.setattr(mesh_upload, "MAX_TRIANGLES", 10)
+    r = client.post("/api/model-uploads", files={"file": ("part.3mf", model_file())})
+    assert r.status_code == 422
+    assert "12 triangles" in r.json()["detail"] and "limit is 10" in r.json()["detail"]
+
+
+def test_open_mesh_error_is_distinct_from_triangle_limit(client):
+    import trimesh
+
+    mesh = trimesh.creation.box()
+    mesh.update_faces([True] * 11 + [False])
+    r = client.post(
+        "/api/model-uploads", files={"file": ("open.stl", mesh.export(file_type="stl"))}
+    )
+    assert r.status_code == 422
+    assert "watertight" in r.json()["detail"] and "Repair" in r.json()["detail"]

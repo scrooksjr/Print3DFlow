@@ -1,7 +1,6 @@
 """Local operator demo. All workflow mutations serialize at the shop transaction boundary."""
 
 import hashlib
-import io
 import json
 import math
 import os
@@ -12,7 +11,6 @@ from decimal import Decimal, ROUND_HALF_UP
 from pathlib import Path
 from typing import Literal
 
-import trimesh
 from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -314,6 +312,8 @@ def intake_draft(body: DraftRequest):
     if body.model_upload_id:
         with engine.connect() as c:
             staged = get(c, body.model_upload_id, "model_upload")
+            if staged.get("repair_review_required"):
+                fail("Approve the repaired geometry before Meta intake", 422)
             if staged["consumed_by"] or parse(staged["expires_at"]) <= now():
                 fail("Model upload expired or already used; upload again")
             f = staged["file"]
@@ -351,6 +351,8 @@ def create_job(body: Intake):
         if not body.model_upload_id:
             fail("Submit a valid STL or 3MF file before creating a print job", 422)
         staged = get(c, body.model_upload_id, "model_upload")
+        if staged.get("repair_review_required"):
+            fail("Review and explicitly approve the repaired model before use", 422)
         if staged["consumed_by"] or parse(staged["expires_at"]) <= now():
             fail("Model upload already used or expired; upload the file again")
         model_path = DATA / (staged["file"]["sha256"] + ".stl")
@@ -426,56 +428,9 @@ def requirements(job_id: str, body: Intake):
 
 
 async def validate_model_upload(file):
-    extension = Path(file.filename or "").suffix.lower()
-    if extension not in (".stl", ".3mf"):
-        fail("Only STL and 3MF files are supported", 422)
-    content = await file.read(10 * 1024 * 1024 + 1)
-    if len(content) > 10 * 1024 * 1024:
-        fail("Model file exceeds 10 MB limit", 413)
-    # Early prototype: in-process parser, bounded file size. Worker isolation is a documented next step.
-    try:
-        if extension == ".3mf":
-            from backend.mesh_upload import import_3mf
+    from backend.model_processing import process_upload
 
-            mesh = import_3mf(content)
-        else:
-            mesh = trimesh.load(io.BytesIO(content), file_type="stl", force="mesh")
-        import numpy as np
-
-        if (
-            not len(mesh.faces)
-            or len(mesh.faces) > 100000
-            or not np.isfinite(mesh.vertices).all()
-        ):
-            raise ValueError("Invalid or excessive geometry")
-        if not mesh.is_watertight or abs(mesh.volume) <= 0:
-            raise ValueError("A closed watertight mesh is required")
-        dims = mesh.extents.tolist()
-        if min(dims) <= 0:
-            raise ValueError("Mesh must have positive dimensions")
-    except Exception:
-        fail(
-            "Mesh is invalid, not watertight, empty, or exceeds 100,000 triangles; manual review required",
-            422,
-        )
-    source_digest = hashlib.sha256(content).hexdigest()
-    normalized = mesh.export(file_type="stl") if extension == ".3mf" else content
-    digest = hashlib.sha256(normalized).hexdigest()
-    metadata = dict(
-        sha256=digest,
-        filename=Path(file.filename).name,
-        dimensions_native=dims,
-        triangles=len(mesh.faces),
-        watertight=True,
-        source_format=extension[1:],
-        embedded_units=mesh.metadata.get("embedded_units")
-        if extension == ".3mf"
-        else None,
-        source_sha256=source_digest,
-        import_note="3MF geometry normalized to mm; embedded print settings ignored; quantity counts complete assemblies"
-        if extension == ".3mf"
-        else "STL units require operator confirmation",
-    )
+    metadata, normalized, _ = await process_upload(file, DATA)
     return metadata, normalized
 
 
@@ -492,6 +447,68 @@ async def stage_model(file: UploadFile = File(...)):
         )
         put(c, "model_upload", staged)
     return {"id": staged["id"], "file": metadata, "expires_at": staged["expires_at"]}
+
+
+@app.post("/api/model-repairs", status_code=201)
+async def attempt_model_repair(file: UploadFile = File(...)):
+    from backend.model_processing import process_upload
+
+    metadata, repaired, report = await process_upload(file, DATA, repair=True)
+    digest = metadata["sha256"]
+    with transaction() as c:
+        (DATA / (digest + ".stl")).write_bytes(repaired)
+        staged = dict(
+            id=uid(),
+            file=metadata,
+            expires_at=(now() + timedelta(hours=1)).isoformat(),
+            consumed_by=None,
+            repair_review_required=True,
+            repair_report=report,
+        )
+        put(c, "model_upload", staged)
+    return dict(
+        id=staged["id"],
+        file=metadata,
+        report=report,
+        approval_required=True,
+        download_url="/api/model-repairs/" + staged["id"] + "/file",
+    )
+
+
+@app.get("/api/model-repairs/{upload_id}/file")
+def download_repair(upload_id: str):
+    with engine.connect() as c:
+        staged = get(c, upload_id, "model_upload")
+        if not staged.get("repair_report") or parse(staged["expires_at"]) <= now():
+            fail("Repair preview missing or expired")
+        return FileResponse(
+            DATA / (staged["file"]["sha256"] + ".stl"),
+            filename="repaired-model.stl",
+            media_type="application/octet-stream",
+        )
+
+
+class RepairApproval(BaseModel):
+    confirmed: Literal[True]
+
+
+@app.post("/api/model-repairs/{upload_id}/approve")
+def approve_repaired_model(upload_id: str, body: RepairApproval):
+    with transaction() as c:
+        staged = get(c, upload_id, "model_upload")
+        if (
+            not staged.get("repair_report")
+            or staged["consumed_by"]
+            or parse(staged["expires_at"]) <= now()
+        ):
+            fail("Repair preview unavailable or expired")
+        staged["repair_review_required"] = False
+        put(c, "model_upload", staged)
+        return {
+            "id": staged["id"],
+            "file": staged["file"],
+            "expires_at": staged["expires_at"],
+        }
 
 
 @app.post("/api/jobs/{job_id}/file")
