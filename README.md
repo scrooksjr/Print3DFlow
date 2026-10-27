@@ -139,9 +139,21 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified four-color keychain workflow
+
+A subsequent isolated run passed **13 browser and API checks** using an original four-color keychain 3MF rather than a synthetic block. It verified:
+
+- The geometry preview showed the keychain and eyelet; the served mesh retained **9,096 triangles** and measured **40 x 49 x 3 mm**.
+- All four filament slots were assigned. The palette displayed black, white, yellow (`#FFE000`) and green (`#75B52A`); the editable requested-color field autofilled those assigned colors and retained them on submission.
+- **PLA** autofilled from the assigned slots and persisted on the created test job.
+- The browser displayed the multicolor verification block and hid quote controls. Manual estimates, native slice quotes and cross-printer comparisons each rejected the unverified multicolor job with **HTTP 422**.
+- No quotes or reservations were created. The source file and main workspace were unchanged, and no physical printer was contacted.
+
+These checks include overlapping UI observations and API assertions. The preview uses a single display color; saved colors appear in the palette, not as rendered paint on the model. This run did not call Meta, perform a successful multicolor slice or verify physical print accuracy. It used an isolated test workspace with default demo pricing. The original model, screenshots and raw report remain private; only this summary is published.
+
 ### Verified assigned-color autofill and palette display
 
-The latest isolated end-to-end run passed **17 checks** across browser interactions and API assertions, using owned synthetic 3MF fixtures, synthetic demo pricing and **two live Meta intake calls**. It verified:
+An earlier isolated end-to-end run passed **17 checks** across browser interactions and API assertions, using owned synthetic 3MF fixtures, synthetic demo pricing and **two live Meta intake calls**. It verified:
 
 - A four-entry saved palette with only slot 2 assigned autofilled **Green** only. All four entries remained visible, with assigned and unused slots distinguished.
 - Meta retained the assigned color without asking a redundant color question. A manual change to **Purple** survived re-extraction and was saved when the reviewed job was submitted.
