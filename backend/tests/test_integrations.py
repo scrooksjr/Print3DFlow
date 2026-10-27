@@ -16,6 +16,7 @@ def draft_payload(**changes):
         title="Mounting blocks",
         quantity=3,
         material="PLA",
+        color=None,
         units="mm",
         deadline=(datetime.now(timezone.utc) + timedelta(days=4)).isoformat(),
         finish=None,
@@ -107,6 +108,39 @@ def test_missing_and_unsupported_fields_require_clarification(client, monkeypatc
     assert set(result["missing_fields"]) == {"quantity", "units", "deadline"}
     assert result["draft"]["quantity"] is None
     assert len(result["draft"]["questions"]) >= 3
+    assert any("PLA only" in w for w in result["draft"]["warnings"])
+
+
+def test_pla_color_is_not_rejected_and_questions_are_deduplicated(client, monkeypatch):
+    mock_meta(
+        monkeypatch,
+        draft_payload(
+            material="PLA white",
+            units=None,
+            deadline=None,
+            questions=[
+                "What units should the STL use?",
+                "What scale is the file?",
+                "Is there a deadline?",
+                "What completion date is required?",
+            ],
+        ),
+    )
+    result = client.post(
+        "/api/intake/drafts", json={"request": "Print as is, three ghosts in PLA white"}
+    ).json()
+    assert result["draft"]["material"] == "PLA" and result["draft"]["color"] == "white"
+    assert len(result["draft"]["questions"]) == 2
+    assert not any("PLA only" in w for w in result["draft"]["warnings"])
+
+
+@pytest.mark.parametrize("material", ["PLA+", "silk PLA", "PLA PETG blend"])
+def test_modified_materials_still_require_review(client, monkeypatch, material):
+    mock_meta(monkeypatch, draft_payload(material=material))
+    result = client.post(
+        "/api/intake/drafts", json={"request": "Three parts in " + material}
+    ).json()
+    assert result["draft"]["material"] == material
     assert any("PLA only" in w for w in result["draft"]["warnings"])
 
 

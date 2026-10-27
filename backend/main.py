@@ -223,6 +223,7 @@ class Intake(BaseModel):
     request: str = Field(default="", max_length=4000)
     quantity: int = Field(default=1, ge=1, le=100)
     material: Literal["PLA"] = "PLA"
+    color: str | None = Field(default=None, max_length=80)
     units: Literal["mm", "cm", "in"] | None = None
     deadline: datetime
     intake_draft_id: str | None = None

@@ -7,6 +7,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import subprocess
 from pathlib import Path
 from typing import Literal
@@ -30,6 +31,7 @@ class IntakeDraft(BaseModel):
     title: str | None = Field(max_length=120)
     quantity: int | None = Field(ge=1, le=100)
     material: str | None = Field(max_length=80)
+    color: str | None = Field(max_length=80)
     units: Literal["mm", "cm", "in"] | None
     deadline: str | None = Field(max_length=80)
     finish: str | None = Field(max_length=300)
@@ -71,6 +73,9 @@ def extract_intake(request: str, reference_time: datetime | None = None):
         "Resolve an explicit relative date using the supplied local reference time; ambiguous dates/times must be null. "
         "Deadlines must be ISO 8601 with a timezone offset; flag past deadlines. "
         "Current MVP supports PLA only. Preserve an unsupported material verbatim and add a warning. "
+        "Separate polymer material from color: 'PLA white' means material PLA, color white. "
+        "Never treat a color as an unsupported polymer. Preserve modified polymers such as PLA+ or silk PLA for review. "
+        "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
         f"Reference time: {reference.isoformat()}; shop timezone: {zone}."
     )
@@ -128,6 +133,36 @@ def extract_intake(request: str, reference_time: datetime | None = None):
         raise IntegrationError(
             "Meta returned an invalid draft. No job was changed; use manual intake or retry."
         ) from None
+    # Narrow correction for plain PLA plus an ordinary color; do not normalize blends/additives.
+    if draft.material:
+        match = re.fullmatch(
+            r"(?:PLA\s+(white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|brown|clear)|(?:(white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|brown|clear)\s+PLA))",
+            draft.material.strip(),
+            re.I,
+        )
+        if match and (
+            not draft.color or draft.color.lower() == (match[1] or match[2]).lower()
+        ):
+            draft.color = draft.color or match[1] or match[2]
+            draft.material = "PLA"
+    # Keep one model clarification per topic; add deterministic fallbacks only if absent.
+    patterns = {
+        "units": r"\b(unit|units|scale|scaling)\b",
+        "deadline": r"\b(deadline|completion|due|deliver|date)\b",
+        "quantity": r"\b(quantity|copies|how many)\b",
+        "material": r"\b(material|polymer)\b",
+    }
+    seen = set()
+    questions = []
+    for question in draft.questions:
+        topic = next(
+            (k for k, p in patterns.items() if re.search(p, question, re.I)),
+            question.strip().lower(),
+        )
+        if topic not in seen:
+            seen.add(topic)
+            questions.append(question)
+    draft.questions = questions
     missing = []
     for field, question in [
         ("quantity", "How many parts do you need?"),
@@ -137,7 +172,7 @@ def extract_intake(request: str, reference_time: datetime | None = None):
     ]:
         if getattr(draft, field) is None:
             missing.append(field)
-            if question not in draft.questions:
+            if field not in seen:
                 draft.questions.append(question)
     if draft.deadline:
         try:
