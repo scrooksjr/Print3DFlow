@@ -118,6 +118,16 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified STL and 3MF submissions
+
+The latest live end-to-end runs passed **47 checks: 23 for STL and 24 for 3MF**, in separate isolated databases using synthetic geometry and invented demo pricing. Both used real `muse-spark-1.3` intake and comparison inference plus native Bambu Studio slices for A1, A1 mini and X2D. The additional 3MF check verified that embedded centimeter units normalize to the expected millimeter dimensions.
+
+Both workflows verified required model submission, no empty job during staging, independently priced/scheduled candidates, and explicit consent before sending comparison totals to Meta. Initial and recovery advice left the current job quote and reservations unchanged. An alternative had its own slice and a different quote; incorrect-price acknowledgements and unconfirmed approvals were rejected without changing commitments. Only exact-price/reservation approval atomically switched the simulated outage job from X2D to A1 mini. Repeating that approval was idempotent.
+
+These live runs used synthetic prices, not private shop-rate-derived totals. No main-workspace jobs were changed and no physical printer was contacted. Only this summary is public; raw reports, imported profiles, API credentials and private rate cards remain excluded. Separately, the latest automated regression run passed **97 tests**, with two optional native-slicing tests skipped; mocked provider tests are distinct from live inference evidence.
+
+To repeat the workflow, follow the judge verification and cross-printer instructions above in a fresh rehearsal with synthetic rates and your own Meta access/imported printer profiles. Select the required STL or supported 3MF file in the new-job form. For 3MF, review the normalized dimensions and assembly interpretation; embedded manufacturing settings do not override the selected printer profiles.
+
 ### Verified A1 and A1 mini workflows
 
 A local end-to-end run passed **31 checks across A1 and A1 mini**, using real `muse-spark-1.3` intake and recovery inference, native Bambu Studio slicing, and an isolated database with the operator's configured rate card. Each workflow validated the owned `samples/demo-block.stl`, calculated a quote against the active rate-card snapshot, proposed matching printer capacity, and recovered from a simulated pre-start outage.
