@@ -1,0 +1,14 @@
+{
+  "profiles": [
+    {
+      "id": "demo-pla-0.2-v1",
+      "name": "Bambu A1 reference / PLA / 0.4 nozzle (demo only)",
+      "source": "bambu_system_reference",
+      "machine": "Bambu Lab A1 0.4 nozzle",
+      "process": "0.20mm Standard @BBL A1",
+      "filament": "Bambu PLA Basic @BBL A1",
+      "bed_mm": [220, 220, 250],
+      "calibrated": false
+    }
+  ]
+}
