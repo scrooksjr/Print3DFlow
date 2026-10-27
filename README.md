@@ -97,6 +97,23 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified A1 and A1 mini workflows
+
+A local end-to-end run passed **31 checks across A1 and A1 mini**, using real `muse-spark-1.3` intake and recovery inference, native Bambu Studio slicing, and an isolated database with the operator's configured rate card. Each workflow validated the owned `samples/demo-block.stl`, calculated a quote against the active rate-card snapshot, proposed matching printer capacity, and recovered from a simulated pre-start outage.
+
+| Imported profile | Sample filament estimate | Sample total slicer time |
+| --- | --- | --- |
+| A1 / PLA / 0.4 mm | 2.540 g | 15m52s |
+| A1 mini / PLA / 0.4 mm | 2.548 g | 15m31s |
+
+These are slicer estimates for the sample and the locally imported settings, not measured physical-print results or universal estimates for these printers. Exact results depend on your settings and slicer version. No shop rates, quote totals, imported settings, or private test reports are published here.
+
+The live checks confirmed that scheduling proposals, Meta recovery advice, and operator option selection **do not change reservations**. Explicit initial approval creates the reservation; separate recovery approval atomically replaces it and releases the original. Repeating the recovery approval is idempotent, and the approved quote remains unchanged. Each tested profile stayed on its matching printer; this does not establish cross-printer rerouting with interchangeable estimates. No physical printer was contacted and the main workspace was unchanged.
+
+To reproduce, import your own A1 or A1 mini project with `scripts.import_a1_profile`, restart the app, and follow the judge verification sequence above in a fresh rehearsal workspace. Use your own Meta credentials and local rate card. The 31-check result is a summary of a local live run; the public automated suite below uses mocked provider responses and does not rerun this live experiment.
+
+### Automated checks
+
 ```powershell
 & .venv/Scripts/python.exe -m pytest -q
 pnpm --dir frontend build
