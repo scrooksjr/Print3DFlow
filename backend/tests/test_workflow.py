@@ -5,9 +5,13 @@ import trimesh
 
 
 def job(client, deadline_hours=72, units="mm"):
+    mesh = trimesh.creation.box(extents=[20, 30, 10]).export(file_type="stl")
+    staged = client.post("/api/model-uploads", files={"file": ("box.stl", mesh)})
+    assert staged.status_code == 201, staged.text
     res = client.post(
         "/api/jobs",
         json=dict(
+            model_upload_id=staged.json()["id"],
             title="Fixture bracket",
             request="Three PLA parts",
             quantity=3,

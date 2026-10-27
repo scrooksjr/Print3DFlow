@@ -1,4 +1,4 @@
-# Print3DFlow — hackathon submission description
+# Print3DFlow â€” hackathon submission description
 
 ## Copy-ready description
 
@@ -20,9 +20,9 @@ Repository: https://github.com/scrooksjr/Print3DFlow
 
 ## Stage One verification pointers
 
-- **Video 0:18–0:50:** real Meta intake request, returned draft, missing-units clarification, and operator review.
-- **Video 1:55–2:15:** request a Meta recovery explanation and show its model attribution and verified tradeoffs.
-- **Video 2:15–2:40:** show the original reservation unchanged before the separate Approve recovery action, then show the committed replacement.
+- **Video 0:18â€“0:50:** real Meta intake request, returned draft, missing-units clarification, and operator review.
+- **Video 1:55â€“2:15:** request a Meta recovery explanation and show its model attribution and verified tradeoffs.
+- **Video 2:15â€“2:40:** show the original reservation unchanged before the separate Approve recovery action, then show the committed replacement.
 - **Code:** `backend/integrations.py` performs intake inference; `backend/recovery.py` performs recovery inference and grounded-response validation. Both call the Meta Model API. `backend/main.py` implements the API and approval transaction boundary.
 - **Cross-printer adviser:** `backend/comparison.py` performs independent slicing, candidate pricing, schedule checks, validated Meta comparison and approval. `frontend/src/PrinterComparison.tsx` exposes separate data-sharing consent, option selection, and exact-price/reservation approval. `backend/tests/test_comparison.py` covers changed rates/capacity/profiles, provider failures, invalid model claims, support review, and explicit approval.
 - **Verify cross-printer behavior:** import your supported profiles, upload the owned sample, select profiles in Cross-printer quote adviser, review settings/support inputs and request independent slices. For a safe public demonstration, use synthetic pricing. Permit sending the displayed totals, request Meta advice, and show that the original quote/reservation remain unchanged. Select an option, then separately approve its exact price and reservation. During a simulated pre-start outage, verify the old reservation is released only at approval. Align video pointers to the final edit if this sequence replaces the single-printer recovery shot.

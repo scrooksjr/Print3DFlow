@@ -85,6 +85,12 @@ def test_meta_draft_is_review_only_and_uses_official_schema(client, monkeypatch)
         deadline=result["draft"]["deadline"],
         intake_draft_id=result["id"],
     )
+    import trimesh
+
+    mesh = trimesh.creation.box(extents=[3, 2, 1]).export(file_type="stl")
+    body["model_upload_id"] = client.post(
+        "/api/model-uploads", files={"file": ("part.stl", mesh)}
+    ).json()["id"]
     assert client.post("/api/jobs", json=body).status_code == 422
     body["ai_review_confirmed"] = True
     assert client.post("/api/jobs", json=body).status_code == 201

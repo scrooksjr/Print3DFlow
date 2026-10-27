@@ -74,9 +74,17 @@ def main():
             and d["units"] == "mm"
             and bool(d["deadline"]),
         )
+        with (root / "samples/demo-block.stl").open("rb") as mesh:
+            staged_response = client.post(
+                "/api/model-uploads",
+                files={"file": ("demo-block.stl", mesh, "application/octet-stream")},
+            )
+            staged_response.raise_for_status()
+            staged_model = staged_response.json()
         job = post(
             "/api/jobs",
             dict(
+                model_upload_id=staged_model["id"],
                 title="E2E synthetic / Meta to X2D recovery",
                 request=complete,
                 quantity=d["quantity"],

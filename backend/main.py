@@ -227,6 +227,7 @@ class Intake(BaseModel):
     deadline: datetime
     intake_draft_id: str | None = None
     ai_review_confirmed: bool = False
+    model_upload_id: str | None = None
 
     @field_validator("deadline")
     @classmethod
@@ -326,6 +327,18 @@ def state():
 @app.post("/api/jobs", status_code=201)
 def create_job(body: Intake):
     with transaction() as c:
+        if not body.model_upload_id:
+            fail("Submit a valid STL or 3MF file before creating a print job", 422)
+        staged = get(c, body.model_upload_id, "model_upload")
+        if staged["consumed_by"] or parse(staged["expires_at"]) <= now():
+            fail("Model upload already used or expired; upload the file again")
+        model_path = DATA / (staged["file"]["sha256"] + ".stl")
+        if (
+            not model_path.is_file()
+            or hashlib.sha256(model_path.read_bytes()).hexdigest()
+            != staged["file"]["sha256"]
+        ):
+            fail("Validated model is unavailable; upload the file again")
         if body.intake_draft_id:
             draft = get(c, body.intake_draft_id, "intake_draft")
             if not body.ai_review_confirmed:
@@ -343,13 +356,20 @@ def create_job(body: Intake):
         job = dict(
             id=uid(),
             **body.model_dump(mode="json"),
-            status="needs_clarification" if body.units is None else "draft",
+            status="needs_clarification"
+            if body.units is None and staged["file"]["source_format"] != "3mf"
+            else "ready_for_quote",
             version=1,
             requirements_version=1,
             created_at=stamp(),
-            file=None,
+            file=staged["file"],
         )
+        if staged["file"]["source_format"] == "3mf":
+            job["units"] = "mm"
+        staged["consumed_by"] = job["id"]
+        put(c, "model_upload", staged)
         put(c, "job", job)
+        audit(c, job["id"], "mesh_validated", job["file"])
         audit(
             c,
             job["id"],
@@ -379,16 +399,21 @@ def requirements(job_id: str, body: Intake):
         return job
 
 
-@app.post("/api/jobs/{job_id}/file")
-async def upload(job_id: str, file: UploadFile = File(...)):
-    if not (file.filename or "").lower().endswith(".stl"):
-        fail("Only STL files are supported", 422)
+async def validate_model_upload(file):
+    extension = Path(file.filename or "").suffix.lower()
+    if extension not in (".stl", ".3mf"):
+        fail("Only STL and 3MF files are supported", 422)
     content = await file.read(10 * 1024 * 1024 + 1)
     if len(content) > 10 * 1024 * 1024:
-        fail("STL exceeds 10 MB limit", 413)
+        fail("Model file exceeds 10 MB limit", 413)
     # Early prototype: in-process parser, bounded file size. Worker isolation is a documented next step.
     try:
-        mesh = trimesh.load(io.BytesIO(content), file_type="stl", force="mesh")
+        if extension == ".3mf":
+            from backend.mesh_upload import import_3mf
+
+            mesh = import_3mf(content)
+        else:
+            mesh = trimesh.load(io.BytesIO(content), file_type="stl", force="mesh")
         import numpy as np
 
         if (
@@ -407,22 +432,53 @@ async def upload(job_id: str, file: UploadFile = File(...)):
             "Mesh is invalid, not watertight, empty, or exceeds 100,000 triangles; manual review required",
             422,
         )
-    digest = hashlib.sha256(content).hexdigest()
+    source_digest = hashlib.sha256(content).hexdigest()
+    normalized = mesh.export(file_type="stl") if extension == ".3mf" else content
+    digest = hashlib.sha256(normalized).hexdigest()
+    metadata = dict(
+        sha256=digest,
+        filename=Path(file.filename).name,
+        dimensions_native=dims,
+        triangles=len(mesh.faces),
+        watertight=True,
+        source_format=extension[1:],
+        source_sha256=source_digest,
+        import_note="3MF geometry normalized to mm; embedded print settings ignored; quantity counts complete assemblies"
+        if extension == ".3mf"
+        else "STL units require operator confirmation",
+    )
+    return metadata, normalized
+
+
+@app.post("/api/model-uploads", status_code=201)
+async def stage_model(file: UploadFile = File(...)):
+    metadata, normalized = await validate_model_upload(file)
+    with transaction() as c:
+        (DATA / (metadata["sha256"] + ".stl")).write_bytes(normalized)
+        staged = dict(
+            id=uid(),
+            file=metadata,
+            expires_at=(now() + timedelta(hours=1)).isoformat(),
+            consumed_by=None,
+        )
+        put(c, "model_upload", staged)
+    return {"id": staged["id"], "file": metadata, "expires_at": staged["expires_at"]}
+
+
+@app.post("/api/jobs/{job_id}/file")
+async def upload(job_id: str, file: UploadFile = File(...)):
+    metadata, normalized = await validate_model_upload(file)
     with transaction() as c:
         job = get(c, job_id, "job")
         if job["status"] in ("scheduled", "recovery_required", "completed"):
             fail("Cannot replace a scheduled mesh")
-        job["file"] = dict(
-            sha256=digest,
-            filename=Path(file.filename).name,
-            dimensions_native=dims,
-            triangles=len(mesh.faces),
-            watertight=True,
-        )
+        job["file"] = metadata
+        if metadata["source_format"] == "3mf":
+            job["units"] = "mm"
         job["version"] += 1
         job["requirements_version"] += 1
         job["status"] = "ready_for_quote" if job["units"] else "needs_clarification"
-        (DATA / (digest + ".stl")).write_bytes(content)
+        (DATA / (metadata["sha256"] + ".stl")).write_bytes(normalized)
         put(c, "job", job)
         audit(c, job_id, "mesh_validated", job["file"])
         return job
@@ -562,7 +618,7 @@ def build_quote(c, job, body: Estimates, provenance=None):
     if job["status"] in ("scheduled", "recovery_required", "completed"):
         fail("Job is already committed")
     if not job["file"] or not job["units"]:
-        fail("Upload a valid STL and confirm units before quoting", 422)
+        fail("Upload a valid model and confirm units before quoting", 422)
     scale = {"mm": 1, "cm": 10, "in": 25.4}[job["units"]]
     dims = [round(x * scale, 4) for x in job["file"]["dimensions_native"]]
     if not any(
@@ -766,7 +822,7 @@ def slice_quote(job_id: str, body: SliceRequest, background: BackgroundTasks):
         if job["status"] in ("scheduled", "recovery_required", "completed"):
             fail("Scheduled jobs cannot be requoted")
         if not job["file"] or not job["units"]:
-            fail("Upload an STL and confirm units before slicing", 422)
+            fail("Upload a model and confirm units before slicing", 422)
         dimensions = [
             v * {"mm": 1, "cm": 10, "in": 25.4}[job["units"]]
             for v in job["file"]["dimensions_native"]

@@ -78,6 +78,14 @@ For intake, only the request text and date/time context are sent when the operat
 
 ## Printer configuration
 
+### STL and 3MF job uploads
+
+Creating a new job requires a validated model file. The UI stages the upload through `POST /api/model-uploads`, then passes the returned single-use `model_upload_id` to `POST /api/jobs`. Missing, expired, consumed or invalid uploads cannot create a job. Staged uploads expire after one hour; Meta extraction alone remains a draft and creates no job.
+
+Job uploads accept `.stl` and supported `.3mf` geometry (up to 10 MB compressed/input size and 100,000 triangles). STL units require operator confirmation. 3MF embedded units and component/build transforms are converted into millimeter geometry for preview, quoting and independent printer slices. A multi-object build is treated as one assembly; quantity repeats the complete assembly, not each object separately. Review the preview and resulting dimensions before approval.
+
+Uploaded 3MF printer/process settings, G-code and scripts are ignored; only the registered, operator-reviewed profile drives slicing. The app retains normalized STL geometry plus source provenance, not the original archive. Modifiers, cyclic or external references, unsupported geometry and archives exceeding inspection limits require manual review. Saving printer settings as a trusted local profile remains a separate importer workflow.
+
 ### Cross-printer comparisons
 
 After uploading a mesh and confirming units, open **Cross-printer quote adviser**. Select imported profiles, review their saved settings, and enter a reviewed support share separately for each profile when known. Unknown support share can block approval under the configured support-surcharge policy; do not guess zero. The optional support surcharge is not applied in this comparison workflow.
