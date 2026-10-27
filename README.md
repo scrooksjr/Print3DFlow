@@ -139,9 +139,22 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified assigned-color autofill and palette display
+
+The latest isolated end-to-end run passed **17 checks** across browser interactions and API assertions, using owned synthetic 3MF fixtures, synthetic demo pricing and **two live Meta intake calls**. It verified:
+
+- A four-entry saved palette with only slot 2 assigned autofilled **Green** only. All four entries remained visible, with assigned and unused slots distinguished.
+- Meta retained the assigned color without asking a redundant color question. A manual change to **Purple** survived re-extraction and was saved when the reviewed job was submitted.
+- A model assigned to all four slots autofilled **Red / Green / Blue / White**, displayed its palette and assignments, and retained those colors on job creation.
+- Missing assignments and unresolved encoded paint produced no invented color suggestion.
+- The browser displayed the multicolor verification block and hid quoting controls. Manual quotes, native slice quotes and cross-printer comparisons each rejected the unverified multicolor job with HTTP 422.
+- No quotes or reservations were created. Main-workspace jobs were unchanged, and no physical printer was contacted.
+
+These 17 checks include UI observations and API assertions of overlapping workflow behavior; they are not 17 independent scenarios. This run verified intake and quote safeguards, not successful multicolor slicing or physical print accuracy. Private shop rates were not loaded, and model archives stayed local. Only this summary is published; credentials, material costs, imported settings, model files and raw reports remain excluded.
+
 ### Verified filament autofill and review workflows
 
-The latest isolated live workflow run passed **45 checks** using synthetic models and demo pricing, real Meta intake calls, actual isolated geometry workers and a native A1 mini slice. The run verified:
+An earlier isolated live workflow run passed **45 checks** using synthetic models and demo pricing, real Meta intake calls, actual isolated geometry workers and a native A1 mini slice. The run verified:
 
 - 3MF material suggestions use assigned slots only; unused saved materials do not change the suggestion.
 - Changing an extracted PLA request to PETG is rejected without explicit override confirmation. A confirmed edit records PETG as awaiting configuration rather than substituting PLA.
