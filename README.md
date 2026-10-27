@@ -137,13 +137,26 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified filament autofill and review workflows
+
+The latest isolated live workflow run passed **45 checks** using synthetic models and demo pricing, real Meta intake calls, actual isolated geometry workers and a native A1 mini slice. The run verified:
+
+- 3MF material suggestions use assigned slots only; unused saved materials do not change the suggestion.
+- Changing an extracted PLA request to PETG is rejected without explicit override confirmation. A confirmed edit records PETG as awaiting configuration rather than substituting PLA.
+- STL intake leaves unstated material and units unresolved. Blank material is rejected; reviewed manual PLA/color/units entry produces a native quote without reserving capacity.
+- Missing and conflicting assignments ask for clarification without inventing PLA. Selecting PLA afterward does not bypass unresolved mapping safeguards.
+- Four-color PLA may suggest a common polymer, but multicolor quoting remains blocked until physical mappings and multicolor slicer results are verified.
+- PETG, ABS, ASA and TPU remain blocked across manual quotes, native slice quotes and cross-printer comparisons until material-specific profiles and rates are configured.
+
+No test committed a reservation, contacted a physical printer or modified main-workspace jobs. Material costs, credentials, imported settings, user model files and raw reports remain private; only this verification summary is published. These were API workflow checks, not a browser automation run. The latest separate regression suite passed **135 tests**, with two optional native-slicing tests skipped; provider mocks in that suite are not live inference evidence.
+
 ### Verified STL and 3MF submissions
 
-The latest live end-to-end runs passed **47 checks: 23 for STL and 24 for 3MF**, in separate isolated databases using synthetic geometry and invented demo pricing. Both used real `muse-spark-1.3` intake and comparison inference plus native Bambu Studio slices for A1, A1 mini and X2D. The additional 3MF check verified that embedded centimeter units normalize to the expected millimeter dimensions.
+An earlier live end-to-end run passed **47 checks: 23 for STL and 24 for 3MF**, in separate isolated databases using synthetic geometry and invented demo pricing. Both used real `muse-spark-1.3` intake and comparison inference plus native Bambu Studio slices for A1, A1 mini and X2D. The additional 3MF check verified that embedded centimeter units normalize to the expected millimeter dimensions.
 
 Both workflows verified required model submission, no empty job during staging, independently priced/scheduled candidates, and explicit consent before sending comparison totals to Meta. Initial and recovery advice left the current job quote and reservations unchanged. An alternative had its own slice and a different quote; incorrect-price acknowledgements and unconfirmed approvals were rejected without changing commitments. Only exact-price/reservation approval atomically switched the simulated outage job from X2D to A1 mini. Repeating that approval was idempotent.
 
-These live runs used synthetic prices, not private shop-rate-derived totals. No main-workspace jobs were changed and no physical printer was contacted. Only this summary is public; raw reports, imported profiles, API credentials and private rate cards remain excluded. Separately, the latest automated regression run passed **97 tests**, with two optional native-slicing tests skipped; mocked provider tests are distinct from live inference evidence.
+These earlier live runs used synthetic prices, not private shop-rate-derived totals. No main-workspace jobs were changed and no physical printer was contacted. Only this summary is public; raw reports, imported profiles, API credentials and private rate cards remain excluded. At that milestone, the automated regression run passed **97 tests**, with two optional native-slicing tests skipped; mocked provider tests are distinct from live inference evidence.
 
 To repeat the workflow, follow the judge verification and cross-printer instructions above in a fresh rehearsal with synthetic rates and your own Meta access/imported printer profiles. Select the required STL or supported 3MF file in the new-job form. For 3MF, review the normalized dimensions and assembly interpretation; embedded manufacturing settings do not override the selected printer profiles.
 
