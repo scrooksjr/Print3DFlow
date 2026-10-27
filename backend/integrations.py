@@ -43,7 +43,9 @@ def meta_configured():
     return bool(os.getenv("META_API_KEY", "").strip())
 
 
-def extract_intake(request: str, reference_time: datetime | None = None):
+def extract_intake(
+    request: str, reference_time: datetime | None = None, file_context=None
+):
     key = os.getenv("META_API_KEY", "").strip()
     if not key:
         raise IntegrationError(
@@ -77,13 +79,24 @@ def extract_intake(request: str, reference_time: datetime | None = None):
         "Never treat a color as an unsupported polymer. Preserve modified polymers such as PLA+ or silk PLA for review. "
         "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
+        "Validated file context, when supplied, describes an attached local model. Do not ask for the object/file again. "
+        "For 3MF, geometry is already normalized to mm using embedded units: return units mm and do not ask STL-scale questions. "
+        "For STL, dimensions_native have no inherent units; ask for units if not stated. "
+        "Vague sizes such as small, medium or large require a target dimension with units or explicit confirmation to use the uploaded original size. Never invent a size or resize geometry. "
         f"Reference time: {reference.isoformat()}; shop timezone: {zone}."
     )
     payload = {
         "model": model,
         "messages": [
             {"role": "system", "content": prompt},
-            {"role": "user", "content": request},
+            {
+                "role": "user",
+                "content": json.dumps(
+                    dict(request=request, validated_file=file_context)
+                )
+                if file_context
+                else request,
+            },
         ],
         "response_format": {
             "type": "json_schema",
@@ -145,8 +158,15 @@ def extract_intake(request: str, reference_time: datetime | None = None):
         ):
             draft.color = draft.color or match[1] or match[2]
             draft.material = "PLA"
-    # Keep one model clarification per topic; add deterministic fallbacks only if absent.
+    embedded = bool(file_context and file_context.get("format") == "3mf")
+    vague_size = bool(
+        re.search(r"\b(small|medium|large)(?:[ -]sized)?\b", request, re.I)
+    )
+    if embedded:
+        draft.units = "mm"
+    # Keep one clarification per topic, separating intended size from source units.
     patterns = {
+        "size": r"\b(size|sized|dimension|dimensions|height|width|length)\b",
         "units": r"\b(unit|units|scale|scaling)\b",
         "deadline": r"\b(deadline|completion|due|deliver|date)\b",
         "quantity": r"\b(quantity|copies|how many)\b",
@@ -159,10 +179,22 @@ def extract_intake(request: str, reference_time: datetime | None = None):
             (k for k, p in patterns.items() if re.search(p, question, re.I)),
             question.strip().lower(),
         )
+        if embedded and topic == "units":
+            continue
+        if file_context and re.search(
+            r"(provide|upload|attach).*(file|model)|what object|which object",
+            question,
+            re.I,
+        ):
+            continue
         if topic not in seen:
             seen.add(topic)
             questions.append(question)
     draft.questions = questions
+    if vague_size and "size" not in seen:
+        draft.questions.append(
+            "What exact height, width or length do you want, with units, or should we use the uploaded model at its original size?"
+        )
     missing = []
     for field, question in [
         ("quantity", "How many parts do you need?"),
@@ -187,15 +219,26 @@ def extract_intake(request: str, reference_time: datetime | None = None):
                 "Please confirm a future deadline with date, time, and time zone."
             )
     if draft.material and draft.material.upper() != "PLA":
+        draft.warnings = [
+            w
+            for w in draft.warnings
+            if not re.search(
+                r"PLA.only|only.PLA|unsupported.*material|material.*unsupported",
+                w,
+                re.I,
+            )
+        ]
         draft.warnings.append(
             "This MVP supports PLA only; the requested material must be resolved before creating a PLA job."
         )
+    draft.warnings = list(dict.fromkeys(draft.warnings))
     return {
         "draft": draft.model_dump(),
         "missing_fields": missing,
         "model": model,
         "source": "meta_model_api",
         "review_required": True,
+        "size_review_required": vague_size,
         "reference_time": reference.isoformat(),
     }
 

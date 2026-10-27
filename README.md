@@ -74,7 +74,7 @@ SHOP_TIMEZONE=America/New_York
 
 Use a Meta Model API key with access and credits for the configured Standard-mode model. Restart after editing. Do not put keys in the frontend, screenshots, issues, commits, or public reports. `.env.example` contains placeholders only.
 
-For intake, only the request text and date/time context are sent when the operator requests extraction. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
+For intake, the request text, date/time context and validated file format, dimensions and embedded units (when a model is attached) are sent when the operator requests extraction. Filenames and model contents stay local. Vague sizes such as “medium” prompt an exact-dimension or original-size question; no resizing is performed. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
 
 ## Printer configuration
 

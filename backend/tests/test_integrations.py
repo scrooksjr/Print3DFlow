@@ -111,6 +111,111 @@ def test_missing_and_unsupported_fields_require_clarification(client, monkeypatc
     assert any("PLA only" in w for w in result["draft"]["warnings"])
 
 
+def test_file_context_uses_validated_units_and_medium_size_question(
+    client, monkeypatch
+):
+    from backend.tests.test_mesh_upload import model_file
+
+    staged = client.post(
+        "/api/model-uploads",
+        files={"file": ("private-name.3mf", model_file("centimeter"))},
+    ).json()
+    sent = mock_meta(
+        monkeypatch,
+        draft_payload(
+            material="ABS",
+            color="black",
+            units=None,
+            questions=[
+                "What object should be printed? Please provide a file.",
+                "What units does the STL use?",
+            ],
+            warnings=[
+                "Material ABS is unsupported; MVP supports PLA only.",
+                "ABS material is unsupported.",
+            ],
+        ),
+    )
+    r = client.post(
+        "/api/intake/drafts",
+        json=dict(
+            request="I want a medium sized print, in ABS black.",
+            model_upload_id=staged["id"],
+        ),
+    )
+    assert r.status_code == 201, r.text
+    result = r.json()
+    d = result["draft"]
+    assert d["units"] == "mm" and d["material"] == "ABS"
+    assert result["file_context"]["dimensions_native"] == [30, 20, 10]
+    assert result["file_context"]["embedded_units"] == "centimeter"
+    assert "units" not in result["missing_fields"]
+    assert result["size_review_required"]
+    assert len(d["questions"]) == 1 and "exact" in d["questions"][0]
+    assert len(d["warnings"]) == 1
+    payload = json.loads(sent[0].content)
+    context = json.loads(payload["messages"][1]["content"])["validated_file"]
+    assert context["format"] == "3mf" and context["geometry_units"] == "mm"
+    assert "private-name" not in sent[0].content.decode()
+    assert not client.get("/api/state").json()["jobs"]
+    body = dict(
+        title="ABS print",
+        request=result["request"],
+        material="PLA",
+        quantity=1,
+        units="mm",
+        deadline=d["deadline"],
+        intake_draft_id=result["id"],
+        ai_review_confirmed=True,
+        model_upload_id=staged["id"],
+    )
+    assert client.post("/api/jobs", json=body).status_code == 422
+
+
+def test_file_aware_draft_cannot_be_reused_for_different_model(client, monkeypatch):
+    import trimesh
+
+    mesh = trimesh.creation.box().export(file_type="stl")
+    first = client.post(
+        "/api/model-uploads", files={"file": ("first.stl", mesh)}
+    ).json()
+    second = client.post(
+        "/api/model-uploads", files={"file": ("second.stl", mesh)}
+    ).json()
+    mock_meta(monkeypatch, draft_payload())
+    d = client.post(
+        "/api/intake/drafts",
+        json=dict(request="Three PLA blocks in mm", model_upload_id=first["id"]),
+    ).json()
+    body = dict(
+        title="Blocks",
+        request=d["request"],
+        quantity=3,
+        units="mm",
+        deadline=d["draft"]["deadline"],
+        model_upload_id=second["id"],
+        intake_draft_id=d["id"],
+        ai_review_confirmed=True,
+    )
+    assert client.post("/api/jobs", json=body).status_code == 422
+
+
+def test_stl_context_does_not_invent_embedded_units(client, monkeypatch):
+    import trimesh
+
+    stage = client.post(
+        "/api/model-uploads",
+        files={"file": ("part.stl", trimesh.creation.box().export(file_type="stl"))},
+    ).json()
+    mock_meta(monkeypatch, draft_payload(units=None, questions=[]))
+    r = client.post(
+        "/api/intake/drafts",
+        json=dict(request="Three PLA blocks", model_upload_id=stage["id"]),
+    ).json()
+    assert r["file_context"]["embedded_units"] is None and r["draft"]["units"] is None
+    assert "units" in r["missing_fields"]
+
+
 def test_pla_color_is_not_rejected_and_questions_are_deduplicated(client, monkeypatch):
     mock_meta(
         monkeypatch,

@@ -305,15 +305,35 @@ def integration_status():
 
 class DraftRequest(BaseModel):
     request: str = Field(min_length=5, max_length=4000)
+    model_upload_id: str | None = None
 
 
 @app.post("/api/intake/drafts", status_code=201)
 def intake_draft(body: DraftRequest):
+    context = None
+    if body.model_upload_id:
+        with engine.connect() as c:
+            staged = get(c, body.model_upload_id, "model_upload")
+            if staged["consumed_by"] or parse(staged["expires_at"]) <= now():
+                fail("Model upload expired or already used; upload again")
+            f = staged["file"]
+            context = dict(
+                format=f["source_format"],
+                dimensions_native=f["dimensions_native"],
+                embedded_units=f.get("embedded_units"),
+                geometry_units="mm" if f["source_format"] == "3mf" else None,
+            )
     try:
-        result = integrations.extract_intake(body.request)
+        result = integrations.extract_intake(body.request, file_context=context)
     except integrations.IntegrationError as exc:
         fail(str(exc), 503)
-    result.update(id=uid(), request=body.request, created_at=stamp())
+    result.update(
+        id=uid(),
+        request=body.request,
+        created_at=stamp(),
+        model_upload_id=body.model_upload_id,
+        file_context=context,
+    )
     with transaction() as c:
         put(c, "intake_draft", result)
     return result
@@ -342,6 +362,11 @@ def create_job(body: Intake):
             fail("Validated model is unavailable; upload the file again")
         if body.intake_draft_id:
             draft = get(c, body.intake_draft_id, "intake_draft")
+            if (
+                draft.get("model_upload_id")
+                and draft["model_upload_id"] != body.model_upload_id
+            ):
+                fail("Model changed after Meta review; extract a fresh draft", 422)
             if not body.ai_review_confirmed:
                 fail("Review and confirm the AI draft before creating a job", 422)
             if body.request != draft["request"]:
@@ -443,6 +468,9 @@ async def validate_model_upload(file):
         triangles=len(mesh.faces),
         watertight=True,
         source_format=extension[1:],
+        embedded_units=mesh.metadata.get("embedded_units")
+        if extension == ".3mf"
+        else None,
         source_sha256=source_digest,
         import_note="3MF geometry normalized to mm; embedded print settings ignored; quantity counts complete assemblies"
         if extension == ".3mf"

@@ -167,4 +167,6 @@ def import_3mf(content):
         if not meshes:
             raise ValueError("No printable geometry")
         # One uploaded assembly is one quoted unit; preserve relative placement.
-        return trimesh.util.concatenate(meshes)
+        result = trimesh.util.concatenate(meshes)
+        result.metadata["embedded_units"] = root.get("unit", "millimeter")
+        return result
