@@ -83,6 +83,7 @@ def extract_intake(
         "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
         "A selected_material is an explicit form choice. Use it when text omits material; ask for resolution if it conflicts with the text. "
+        "File material_inference is a suggestion from assigned slots only, not from unused palette entries. Use an unambiguous suggestion if text omits material. Ask the supplied clarification for missing/conflicting mappings, and flag conflicts between the request and file suggestion. Never infer a material from color alone. "
         "Validated file context, when supplied, describes an attached local model. Do not ask for the object/file again. "
         "For 3MF, geometry is already normalized to mm using embedded units: return units mm and do not ask STL-scale questions. "
         "For STL, dimensions_native have no inherent units; ask for units if not stated. "
@@ -156,6 +157,23 @@ def extract_intake(
         ) from None
     if draft.material is None and requested_material:
         draft.material = requested_material
+    inference = (file_context or {}).get("material_inference")
+    if inference:
+        text_types = set(re.findall(r"\b(?:PLA|PETG|ABS|ASA|TPU)\b", request.upper()))
+        suggestion = inference.get("suggested_material")
+        if not requested_material and not text_types:
+            draft.material = suggestion
+        if inference.get("clarification") and (
+            inference.get("status")
+            in ("conflicting_materials", "unresolved_assignments")
+            or not requested_material
+            and not text_types
+        ):
+            draft.questions.append(inference["clarification"])
+        if suggestion and text_types and text_types != {suggestion}:
+            draft.questions.append(
+                f"The assigned file slots suggest {suggestion}, but the request names {', '.join(sorted(text_types))}. Which material should be used?"
+            )
     # Only split known plain polymers and ordinary colors; blends remain unmodified.
     if draft.material:
         colors = (
@@ -185,7 +203,7 @@ def extract_intake(
         "units": r"\b(unit|units|scale|scaling)\b",
         "deadline": r"\b(deadline|completion|due|deliver|date)\b",
         "quantity": r"\b(quantity|copies|how many)\b",
-        "material": r"\b(material|polymer)\b",
+        "material": r"\b(material|materials|polymer|filament|filaments)\b",
     }
     seen = set()
     questions = []

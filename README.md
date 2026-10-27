@@ -89,6 +89,8 @@ New jobs can request PLA, PETG, ABS, ASA or TPU, with color stored separately. M
 
 #### Four-color MVP inspection
 
+The requested filament selector is suggested from **assigned 3MF slots only** when all referenced slots agree on one catalog material. Unused saved slots do not affect it. Missing, mixed, unsupported or unresolved assignments leave it unselected and ask for clarification. The field remains editable; changing a Meta-extracted material requires an explicit override confirmation before creating the job. This changes the request, not the uploaded color/tool mappings, and does not remove quote blocks. STL files leave the material unselected for user entry; user-written request text can still be extracted by Meta.
+
 3MF uploads show saved filament colors/materials, known object/part slot assignments and standard face-property references. Saved slots are listed separately from slots actually assigned to printable geometry; unused palette entries do not prove multicolor use. Encoded paint is detected but not decoded into verified physical mappings. The MVP limit is four assigned colors/filament slots; projects exceeding it are flagged and blocked.
 
 Multicolor, painted, textured or unresolved color/material assignments block **all** quoting paths, including manual estimates, native slicing and cross-printer comparisons. No verification override is provided yet: mapping and multicolor slicer-result verification must be implemented before enabling these quotes. Existing approval checks cannot bypass the block. Previously uploaded 3MFs without color inspection must be uploaded again before quoting. Single-filament projects with extra unused saved slots remain eligible when assignments are unambiguous.

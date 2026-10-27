@@ -226,6 +226,7 @@ class Intake(BaseModel):
     deadline: datetime
     intake_draft_id: str | None = None
     ai_review_confirmed: bool = False
+    material_override_confirmed: bool = False
     model_upload_id: str | None = None
 
     @field_validator("deadline")
@@ -331,6 +332,12 @@ def intake_draft(body: DraftRequest):
                 embedded_units=f.get("embedded_units"),
                 geometry_units="mm" if f["source_format"] == "3mf" else None,
             )
+            if f["source_format"] == "3mf":
+                from backend.color_inspection import infer_material
+
+                context["material_inference"] = infer_material(
+                    f.get("color_info") or {}
+                )
     try:
         result = integrations.extract_intake(
             body.request,
@@ -388,6 +395,7 @@ def create_job(body: Intake):
             if (
                 draft["draft"]["material"]
                 and draft["draft"]["material"].upper() != body.material
+                and not body.material_override_confirmed
             ):
                 fail(
                     "Requested filament differs from the reviewed Meta draft. Revise the request and extract again.",

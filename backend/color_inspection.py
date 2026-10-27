@@ -222,7 +222,7 @@ class ColorInspection:
             self.reasons.add(
                 "This MVP supports at most four assigned colors/filament slots; this project exceeds that limit."
             )
-        return dict(
+        result = dict(
             max_supported_colors=4,
             assigned_color_count=None if self.painted else len(used_colors),
             exceeds_mvp_limit=exceeds_limit,
@@ -240,6 +240,50 @@ class ColorInspection:
             slicer_results_verified=False,
             note="Saved file intent only. Slots listed in a palette are not proof that every slot is used. Colors and physical filament mappings are not applied by the geometry-only slicer.",
         )
+        result["material_inference"] = infer_material(result)
+        return result
+
+
+def infer_material(info):
+    from backend.filaments import TYPES
+
+    slots = info.get("assigned_slots", [])
+    saved = {f["slot"]: f.get("material") for f in info.get("saved_filaments", [])}
+    values = sorted({str(saved.get(slot) or "").strip().upper() for slot in slots})
+    result = dict(
+        suggested_material=None,
+        assigned_materials=[v for v in values if v],
+        source="assigned_3mf_slots",
+        status="missing_assignments",
+        clarification="Which filament type should be used? No usable model-to-filament assignment was found in this 3MF.",
+    )
+    unresolved = (
+        info.get("painted_faces_detected")
+        or any(a.get("filament_slot") is None for a in info.get("assignments", []))
+        or any("unresolved" in r.lower() for r in info.get("block_reasons", []))
+    )
+    if unresolved:
+        result.update(
+            status="unresolved_assignments",
+            clarification="Which filament type should each assigned or painted region use? The saved mappings are unresolved.",
+        )
+    elif len(values) > 1:
+        result.update(
+            status="conflicting_materials",
+            clarification="Assigned slots contain different filament types ("
+            + ", ".join(v or "unspecified" for v in values)
+            + "). Confirm the intended material for each slot; no single type can be assumed.",
+        )
+    elif slots and values and values[0] in TYPES:
+        result.update(
+            status="suggested", suggested_material=values[0], clarification=None
+        )
+    elif slots:
+        result.update(
+            status="unsupported_material",
+            clarification="The assigned filament type is missing or not in the request catalog. Select the intended type for review; do not assume PLA.",
+        )
+    return result
 
 
 def require_single_filament(job):
