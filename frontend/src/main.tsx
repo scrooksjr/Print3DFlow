@@ -9,6 +9,7 @@ import {JobDialog} from './JobDialog';
 import {QuotingPanel} from './QuotingPanel';
 import {ShopRates} from './ShopRates';
 import {RecoveryExplanation} from './RecoveryExplanation';
+import {PrinterComparison} from './PrinterComparison';
 
 type RecordData = Record<string, any>;
 const empty = {jobs:[],printers:[],quotes:[],proposals:[],reservations:[],outages:[],audit:[],tasks:[]} as Record<string,RecordData[]>;
@@ -64,6 +65,7 @@ function App(){
  <div className="section-label"><span>01</span> Geometry & requirements</div>{!job.units&&<div className="clarification"><b>Confirm the STL units</b><p>STL files do not reliably specify units. Confirm the intended scale before quoting.</p><select aria-label="STL units" value={unit} onChange={e=>setUnit(e.target.value)}><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="in">Inches</option></select><button className="secondary" disabled={busy} onClick={()=>run(()=>api('/jobs/'+job.id+'/requirements',{title:job.title,request:job.request,quantity:job.quantity,material:job.material,deadline:job.deadline,units:unit},'PATCH'))}>Confirm units</button></div>}
  {job.file?<><Mesh job={job}/><div className="mesh-info"><span><Check size={14}/> {job.file.filename}</span><span>{job.file.triangles} triangles · {job.units||'units unconfirmed'}</span></div></>:<label className={'upload '+(busy?'disabled':'')}><Upload size={24}/><b>Drop in your next print</b><span>Choose a watertight STL · up to 10 MB</span><input type="file" accept=".stl" disabled={busy} onChange={e=>upload(e.target.files?.[0])}/></label>}
  <QuotingPanel key={job.id} job={job} quote={quote} tasks={data.tasks} slicer={integrations.slicer} busy={busy} run={run} request={api}/>
+ <PrinterComparison key={'compare-'+job.id} job={job} profiles={integrations.slicer.profiles} configured={integrations.meta.configured} busy={busy} run={run} request={api}/>
  <div className="section-label"><span>03</span> Production plan</div>{job.status==='quote_ready'&&<button className="primary full" disabled={busy} onClick={()=>run(()=>api('/jobs/'+job.id+'/proposals'),'Capacity checked. Review and approve the proposed reservation.')}>Find a printer slot <ArrowRight size={16}/></button>}
  {reservation&&<div className="reservation"><span className="pill">{job.status==='recovery_required'?'ORIGINAL RESERVATION · RECOVERY NEEDED':'CONFIRMED RESERVATION'}</span><h3>{data.printers.find(p=>p.id===reservation.printer_id)?.name}</h3><p>{time(reservation.start)} → {time(reservation.end)}</p></div>}
  {job.status==='scheduled'&&<button className="danger full" disabled={busy} onClick={outage}><AlertTriangle size={16}/>Simulate printer outage</button>}

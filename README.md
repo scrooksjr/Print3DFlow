@@ -11,6 +11,7 @@ Print3DFlow connects a customer request to a reviewed quote, a compatible printe
 3. **Shop pricing:** versioned rate cards support material cost, waste policy, machine-time allowance, setup, markup, minimum charges, and reviewed support surcharges.
 4. **Scheduling:** propose compatible capacity and commit reservations atomically after approval.
 5. **Exception recovery:** inject a simulated pre-start outage, ask Meta to compare verified scheduling options, choose a proposal, and approve atomic replacement while preserving the quote.
+6. **Cross-printer quote adviser:** independently slice selected imported A1, A1 mini and X2D profiles, calculate candidate quotes, and check each printer's schedule. After permission to share quote totals, Meta compares verified tradeoffs. You select an option and explicitly approve its exact price and reservation before anything is committed.
 
 Meta handles intake and selects evidence-backed recovery reasons and a recommended option. The server validates every selected reason and renders text from verified facts; freeform model facts are not displayed. Quote arithmetic, scheduling constraints, recovery search, and the customer-update template remain deterministic application logic. No messages or printer commands are sent.
 
@@ -76,6 +77,18 @@ Use a Meta Model API key with access and credits for the configured Standard-mod
 For intake, only the request text and date/time context are sent when the operator requests extraction. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
 
 ## Printer configuration
+
+### Cross-printer comparisons
+
+After uploading a mesh and confirming units, open **Cross-printer quote adviser**. Select imported profiles, review their saved settings, and enter a reviewed support share separately for each profile when known. Unknown support share can block approval under the configured support-surcharge policy; do not guess zero. The optional support surcharge is not applied in this comparison workflow.
+
+Choose **Slice and compare selected printers**. Each profile receives its own native slice, candidate quote, and earliest compatible schedule; X2D estimates are never reused for an A1 or A1 mini. Parts exceeding a selected envelope must be deselected, and failed slices are excluded without fabricated estimates. Quantity uses sequential parts, not batch packing. Different saved presets can affect quality as well as price/time, so review them before choosing.
+
+To request Meta advice, first permit sharing the displayed quote totals, price differences, slice estimates and scheduling facts. Rate-card details, customer text, meshes and printer names are excluded from that provider request. **Compare verified options with Meta** validates option coverage, recommendations and reason codes, then renders explanations from facts. Manual review remains possible if Meta is unavailable.
+
+Selecting a radio option changes only the local UI selection. Check the explicit price/reservation approval box, then choose **Approve price & reservation** to commit. The backend requires the exact option, total and currency and rechecks job, rates, profiles, quote expiry and capacity. Stale results require a fresh comparison. For a simulated pre-start outage, the same action atomically replaces the old reservation and applies the newly approved quote; the historical quote is retained. This differs from same-profile recovery, which preserves its existing quote.
+
+APIs: `POST /api/jobs/{job_id}/comparisons`, `GET /api/jobs/{job_id}/comparisons`, `POST /api/comparisons/{comparison_id}/explanation` (requires `consent_to_send_quote_totals: true`), and `POST /api/comparisons/{comparison_id}/approve`. See `backend/comparison.py` and `backend/tests/test_comparison.py`.
 
 The public sample registry is `profiles/registry.example.json`. The application uses it when the ignored local `profiles/registry.json` does not exist. The sample resolves separately installed Bambu A1 system presets and is **not calibrated**.
 

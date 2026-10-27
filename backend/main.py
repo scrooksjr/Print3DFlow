@@ -63,6 +63,13 @@ async def lifespan(app):
                     finished_at=stamp(),
                 )
                 put(c, "task", task)
+        for batch in rows(c, "comparison"):
+            if batch["status"] in ("queued", "running"):
+                batch.update(
+                    status="failed",
+                    error="Server restarted during comparison. Compare again.",
+                )
+                put(c, "comparison", batch)
     yield
 
 
@@ -1071,105 +1078,105 @@ def select_recovery_option(proposal_id: str, body: SelectRecoveryOption):
 @app.post("/api/proposals/{proposal_id}/approve")
 def approve(proposal_id: str, body: Approve):
     with transaction() as c:
-        p = get(c, proposal_id, "proposal")
-        job = get(c, p["job_id"], "job")
-        for approval in rows(c, "approval"):
-            if approval["idempotency_key"] == body.idempotency_key:
-                if approval["proposal_id"] != proposal_id:
-                    fail("Idempotency key belongs to another proposal")
-                return approval["result"]
-        if (
-            p["status"] != "proposed"
-            or p["job_version"] != job["version"]
-            or parse(p["expires_at"]) <= now()
-        ):
-            fail("Proposal is stale; generate a new proposal")
-        q = valid_quote(c, job)
-        if q["id"] != p["quote_id"]:
-            fail("Quote changed; generate a new proposal")
-        if p["kind"] == "recovery" and p.get("explanation_id"):
-            verified = verified_recovery(c, p)
-            explanation = get(c, p["explanation_id"], "recovery_explanation")
-            if explanation["snapshot_hash"] != verified["snapshot_hash"]:
-                fail(
-                    "Meta explanation is stale because capacity changed. Refresh the proposal/explanation before approval."
-                )
-        expected = "recovery_required" if p["kind"] == "recovery" else "quote_ready"
-        if job["status"] != expected:
-            fail("Job state changed")
-        choice = p["choice"]
-        start = parse(choice["start"])
-        end = parse(choice["end"])
-        if not choice["on_time"]:
+        return approve_in_transaction(c, proposal_id, body)
+
+
+def approve_in_transaction(c, proposal_id, body):
+    p = get(c, proposal_id, "proposal")
+    job = get(c, p["job_id"], "job")
+    for approval in rows(c, "approval"):
+        if approval["idempotency_key"] == body.idempotency_key:
+            if approval["proposal_id"] != proposal_id:
+                fail("Idempotency key belongs to another proposal")
+            return approval["result"]
+    if (
+        p["status"] != "proposed"
+        or p["job_version"] != job["version"]
+        or parse(p["expires_at"]) <= now()
+    ):
+        fail("Proposal is stale; generate a new proposal")
+    q = valid_quote(c, job)
+    if q["id"] != p["quote_id"]:
+        fail("Quote changed; generate a new proposal")
+    if p["kind"] == "recovery" and p.get("explanation_id"):
+        verified = verified_recovery(c, p)
+        explanation = get(c, p["explanation_id"], "recovery_explanation")
+        if explanation["snapshot_hash"] != verified["snapshot_hash"]:
             fail(
-                "Late plan requires a revised customer deadline and manual review; cannot approve in this MVP"
+                "Meta explanation is stale because capacity changed. Refresh the proposal/explanation before approval."
             )
-        if start <= now():
-            fail("Proposed start has passed; generate a new proposal")
-        printer = get(c, choice["printer_id"], "printer")
+    expected = "recovery_required" if p["kind"] == "recovery" else "quote_ready"
+    if job["status"] != expected:
+        fail("Job state changed")
+    choice = p["choice"]
+    start = parse(choice["start"])
+    end = parse(choice["end"])
+    if not choice["on_time"]:
+        fail(
+            "Late plan requires a revised customer deadline and manual review; cannot approve in this MVP"
+        )
+    if start <= now():
+        fail("Proposed start has passed; generate a new proposal")
+    printer = get(c, choice["printer_id"], "printer")
+    if (
+        not printer["active"]
+        or printer["material"] != job["material"]
+        or printer["profile"] != q["profile"]
+        or not all(a <= b for a, b in zip(q["dimensions_mm"], printer["bed_mm"]))
+    ):
+        fail("Printer compatibility changed")
+    old = p["old_reservation"]
+    if old and (job.get("reservation_id") != old["id"] or parse(old["start"]) <= now()):
+        fail("Original reservation changed or started; manual review required")
+    for r in rows(c, "reservation"):
         if (
-            not printer["active"]
-            or printer["material"] != job["material"]
-            or printer["profile"] != q["profile"]
-            or not all(a <= b for a, b in zip(q["dimensions_mm"], printer["bed_mm"]))
+            r["active"]
+            and r["printer_id"] == printer["id"]
+            and (not old or r["id"] != old["id"])
+            and overlaps(start, end, parse(r["start"]), parse(r["end"]))
         ):
-            fail("Printer compatibility changed")
-        old = p["old_reservation"]
-        if old and (
-            job.get("reservation_id") != old["id"] or parse(old["start"]) <= now()
+            fail("Capacity changed; generate a new proposal")
+    for o in rows(c, "outage"):
+        if o["printer_id"] == printer["id"] and overlaps(
+            start, end, parse(o["starts_at"]), parse(o["ends_at"])
         ):
-            fail("Original reservation changed or started; manual review required")
-        for r in rows(c, "reservation"):
-            if (
-                r["active"]
-                and r["printer_id"] == printer["id"]
-                and (not old or r["id"] != old["id"])
-                and overlaps(start, end, parse(r["start"]), parse(r["end"]))
-            ):
-                fail("Capacity changed; generate a new proposal")
-        for o in rows(c, "outage"):
-            if o["printer_id"] == printer["id"] and overlaps(
-                start, end, parse(o["starts_at"]), parse(o["ends_at"])
-            ):
-                fail("Printer outage conflicts; generate a new proposal")
-        if old:
-            old = get(c, old["id"], "reservation")
-            old["active"] = False
-            put(c, "reservation", old)
-        r = dict(
+            fail("Printer outage conflicts; generate a new proposal")
+    if old:
+        old = get(c, old["id"], "reservation")
+        old["active"] = False
+        put(c, "reservation", old)
+    r = dict(
+        id=uid(),
+        job_id=job["id"],
+        printer_id=printer["id"],
+        start=choice["start"],
+        end=choice["end"],
+        active=True,
+        quote_id=q["id"],
+    )
+    put(c, "reservation", r)
+    job.update(status="scheduled", reservation_id=r["id"], version=job["version"] + 1)
+    put(c, "job", job)
+    p["status"] = "approved"
+    put(c, "proposal", p)
+    audit(
+        c,
+        job["id"],
+        "recovery_approved" if old else "plan_approved",
+        {"reservation": r, "previous_reservation": old, "quote_id": q["id"]},
+    )
+    result = {"job": job, "reservation": r}
+    put(
+        c,
+        "approval",
+        dict(
             id=uid(),
-            job_id=job["id"],
-            printer_id=printer["id"],
-            start=choice["start"],
-            end=choice["end"],
-            active=True,
-            quote_id=q["id"],
-        )
-        put(c, "reservation", r)
-        job.update(
-            status="scheduled", reservation_id=r["id"], version=job["version"] + 1
-        )
-        put(c, "job", job)
-        p["status"] = "approved"
-        put(c, "proposal", p)
-        audit(
-            c,
-            job["id"],
-            "recovery_approved" if old else "plan_approved",
-            {"reservation": r, "previous_reservation": old, "quote_id": q["id"]},
-        )
-        result = {"job": job, "reservation": r}
-        put(
-            c,
-            "approval",
-            dict(
-                id=uid(),
-                idempotency_key=body.idempotency_key,
-                proposal_id=proposal_id,
-                result=result,
-            ),
-        )
-        return result
+            idempotency_key=body.idempotency_key,
+            proposal_id=proposal_id,
+            result=result,
+        ),
+    )
+    return result
 
 
 @app.post("/api/outages", status_code=201)
@@ -1224,6 +1231,10 @@ def mesh_file(job_id: str):
             media_type="application/octet-stream",
         )
 
+
+from backend.comparison import register as register_comparison
+
+register_comparison(app)
 
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
