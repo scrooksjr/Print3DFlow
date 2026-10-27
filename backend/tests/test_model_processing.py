@@ -33,7 +33,7 @@ def test_real_worker_does_not_expand_automatic_repair_limit(tmp_path):
     request(tmp_path, trimesh.creation.icosphere(subdivisions=7), repair=True)
     with pytest.raises(HTTPException) as error:
         real_worker(tmp_path, True)
-    assert "250,000" in error.value.detail
+    assert "no longer available" in error.value.detail
 
 
 def test_worker_timeout_and_environment_are_safe(tmp_path, monkeypatch):

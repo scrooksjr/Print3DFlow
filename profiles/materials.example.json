@@ -1,0 +1,10 @@
+{
+  "materials": [
+    {"material": "PLA", "status": "uses_existing_registered_profiles", "profiles": []},
+    {"material": "PETG", "status": "awaiting_reference_projects_and_rates", "profiles": []},
+    {"material": "ABS", "status": "awaiting_reference_projects_and_rates", "profiles": []},
+    {"material": "ASA", "status": "awaiting_reference_projects_and_rates", "profiles": []},
+    {"material": "TPU", "status": "awaiting_reference_projects_and_rates", "profiles": []}
+  ],
+  "note": "Setup checklist only, not slicer presets. No temperatures, machine compatibility or prices are assumed. Import verified private references before enabling additional materials."
+}

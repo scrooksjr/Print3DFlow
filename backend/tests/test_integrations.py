@@ -108,7 +108,7 @@ def test_missing_and_unsupported_fields_require_clarification(client, monkeypatc
     assert set(result["missing_fields"]) == {"quantity", "units", "deadline"}
     assert result["draft"]["quantity"] is None
     assert len(result["draft"]["questions"]) >= 3
-    assert any("PLA only" in w for w in result["draft"]["warnings"])
+    assert any("required before quoting" in w for w in result["draft"]["warnings"])
 
 
 def test_file_context_uses_validated_units_and_medium_size_question(
@@ -214,6 +214,22 @@ def test_stl_context_does_not_invent_embedded_units(client, monkeypatch):
     ).json()
     assert r["file_context"]["embedded_units"] is None and r["draft"]["units"] is None
     assert "units" in r["missing_fields"]
+
+
+def test_explicit_form_material_is_used_without_pla_substitution(client, monkeypatch):
+    sent = mock_meta(monkeypatch, draft_payload(material=None))
+    r = client.post(
+        "/api/intake/drafts",
+        json=dict(request="Three parts in black", requested_material="PETG"),
+    ).json()
+    assert r["draft"]["material"] == "PETG"
+    assert "material" not in r["missing_fields"]
+    assert (
+        json.loads(json.loads(sent[0].content)["messages"][1]["content"])[
+            "selected_material"
+        ]
+        == "PETG"
+    )
 
 
 def test_pla_color_is_not_rejected_and_questions_are_deduplicated(client, monkeypatch):

@@ -8,7 +8,7 @@ import numpy as np
 import trimesh
 
 from backend import mesh_upload
-from backend.model_limits import MAX_REPAIR_TRIANGLES, MAX_NORMALIZED_BYTES
+from backend.model_limits import MAX_NORMALIZED_BYTES
 
 
 def inspect(content, filename, repair=False):
@@ -25,9 +25,9 @@ def inspect(content, filename, repair=False):
         raise mesh_upload.MeshImportError(
             f"Model contains {len(mesh.faces):,} triangles; limit is {mesh_upload.MAX_TRIANGLES:,}. Export a simplified model."
         )
-    if repair and len(mesh.faces) > MAX_REPAIR_TRIANGLES:
+    if repair:
         raise mesh_upload.MeshImportError(
-            f"Automatic repair is limited to {MAX_REPAIR_TRIANGLES:,} triangles. Larger closed models can be uploaded, but repair this model externally."
+            "Automatic repair is no longer available. Upload a repaired model from an external tool."
         )
     if not repair and (not mesh.is_watertight or abs(mesh.volume) <= 0):
         raise mesh_upload.MeshImportError(
@@ -57,17 +57,4 @@ def inspect(content, filename, repair=False):
         if extension == ".3mf"
         else "STL units require operator confirmation",
     )
-    report = None
-    if repair:
-        from backend.repair import repair_copy
-
-        original_hash = metadata["sha256"]
-        normalized, report = repair_copy(normalized)
-        metadata.update(
-            sha256=hashlib.sha256(normalized).hexdigest(),
-            triangles=report["after"]["triangles"],
-            watertight=True,
-            repaired=True,
-            repair_source_sha256=original_hash,
-        )
-    return metadata, normalized, report
+    return metadata, normalized, None

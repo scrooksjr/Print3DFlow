@@ -44,7 +44,10 @@ def meta_configured():
 
 
 def extract_intake(
-    request: str, reference_time: datetime | None = None, file_context=None
+    request: str,
+    reference_time: datetime | None = None,
+    file_context=None,
+    requested_material=None,
 ):
     key = os.getenv("META_API_KEY", "").strip()
     if not key:
@@ -74,11 +77,12 @@ def extract_intake(
         "Title may summarize the stated part. Units refer to intended STL scale, not merely a dimension mentioned in prose. "
         "Resolve an explicit relative date using the supplied local reference time; ambiguous dates/times must be null. "
         "Deadlines must be ISO 8601 with a timezone offset; flag past deadlines. "
-        "Current MVP supports PLA only. Preserve an unsupported material verbatim and add a warning. "
+        "Requestable materials are PLA, PETG, ABS, ASA and TPU. Preserve the requested polymer; never substitute PLA. Only PLA profiles and rates are configured; other materials can be recorded but need setup before quoting. Do not ask customers to substitute PLA for a requested catalog material. "
         "Separate polymer material from color: 'PLA white' means material PLA, color white. "
         "Never treat a color as an unsupported polymer. Preserve modified polymers such as PLA+ or silk PLA for review. "
         "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
+        "A selected_material is an explicit form choice. Use it when text omits material; ask for resolution if it conflicts with the text. "
         "Validated file context, when supplied, describes an attached local model. Do not ask for the object/file again. "
         "For 3MF, geometry is already normalized to mm using embedded units: return units mm and do not ask STL-scale questions. "
         "For STL, dimensions_native have no inherent units; ask for units if not stated. "
@@ -92,9 +96,13 @@ def extract_intake(
             {
                 "role": "user",
                 "content": json.dumps(
-                    dict(request=request, validated_file=file_context)
+                    dict(
+                        request=request,
+                        validated_file=file_context,
+                        selected_material=requested_material,
+                    )
                 )
-                if file_context
+                if file_context or requested_material
                 else request,
             },
         ],
@@ -146,18 +154,25 @@ def extract_intake(
         raise IntegrationError(
             "Meta returned an invalid draft. No job was changed; use manual intake or retry."
         ) from None
-    # Narrow correction for plain PLA plus an ordinary color; do not normalize blends/additives.
+    if draft.material is None and requested_material:
+        draft.material = requested_material
+    # Only split known plain polymers and ordinary colors; blends remain unmodified.
     if draft.material:
+        colors = (
+            "white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|brown|clear"
+        )
+        polymers = "PLA|PETG|ABS|ASA|TPU"
         match = re.fullmatch(
-            r"(?:PLA\s+(white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|brown|clear)|(?:(white|black|red|blue|green|yellow|orange|purple|pink|gray|grey|brown|clear)\s+PLA))",
+            rf"(?:({polymers})\s+({colors})|({colors})\s+({polymers}))",
             draft.material.strip(),
             re.I,
         )
-        if match and (
-            not draft.color or draft.color.lower() == (match[1] or match[2]).lower()
-        ):
-            draft.color = draft.color or match[1] or match[2]
-            draft.material = "PLA"
+        if match:
+            color = match[2] or match[3]
+            polymer = match[1] or match[4]
+            if not draft.color or draft.color.lower() == color.lower():
+                draft.color = draft.color or color
+                draft.material = polymer.upper()
     embedded = bool(file_context and file_context.get("format") == "3mf")
     vague_size = bool(
         re.search(r"\b(small|medium|large)(?:[ -]sized)?\b", request, re.I)
@@ -218,7 +233,9 @@ def extract_intake(
             draft.questions.append(
                 "Please confirm a future deadline with date, time, and time zone."
             )
-    if draft.material and draft.material.upper() != "PLA":
+    if draft.material:
+        from backend.filaments import TYPES
+
         draft.warnings = [
             w
             for w in draft.warnings
@@ -228,9 +245,16 @@ def extract_intake(
                 re.I,
             )
         ]
-        draft.warnings.append(
-            "This MVP supports PLA only; the requested material must be resolved before creating a PLA job."
-        )
+        if draft.material.upper() in TYPES:
+            draft.material = draft.material.upper()
+            if draft.material != "PLA":
+                draft.warnings.append(
+                    f"{draft.material} request can be recorded; verified matching profiles and material rates are required before quoting."
+                )
+        else:
+            draft.warnings.append(
+                "This filament type is not in the request catalog; operator review is required. PLA only remains enabled for quoting."
+            )
     draft.warnings = list(dict.fromkeys(draft.warnings))
     return {
         "draft": draft.model_dump(),

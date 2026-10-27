@@ -220,7 +220,7 @@ class Intake(BaseModel):
     title: str = Field(min_length=1, max_length=120)
     request: str = Field(default="", max_length=4000)
     quantity: int = Field(default=1, ge=1, le=100)
-    material: Literal["PLA"] = "PLA"
+    material: Literal["PLA", "PETG", "ABS", "ASA", "TPU"] = "PLA"
     color: str | None = Field(default=None, max_length=80)
     units: Literal["mm", "cm", "in"] | None = None
     deadline: datetime
@@ -285,6 +285,13 @@ def health():
     }
 
 
+@app.get("/api/filaments")
+def filament_catalog():
+    from backend.filaments import catalog
+
+    return {"materials": catalog()}
+
+
 @app.get("/api/integrations")
 def integration_status():
     return {
@@ -302,6 +309,7 @@ def integration_status():
 
 
 class DraftRequest(BaseModel):
+    requested_material: Literal["PLA", "PETG", "ABS", "ASA", "TPU"] | None = None
     request: str = Field(min_length=5, max_length=4000)
     model_upload_id: str | None = None
 
@@ -324,7 +332,11 @@ def intake_draft(body: DraftRequest):
                 geometry_units="mm" if f["source_format"] == "3mf" else None,
             )
     try:
-        result = integrations.extract_intake(body.request, file_context=context)
+        result = integrations.extract_intake(
+            body.request,
+            file_context=context,
+            requested_material=body.requested_material,
+        )
     except integrations.IntegrationError as exc:
         fail(str(exc), 503)
     result.update(
@@ -375,10 +387,10 @@ def create_job(body: Intake):
                 fail("AI source request changed; regenerate or use manual intake", 422)
             if (
                 draft["draft"]["material"]
-                and draft["draft"]["material"].upper() != "PLA"
+                and draft["draft"]["material"].upper() != body.material
             ):
                 fail(
-                    "The extracted request uses an unsupported material. Resolve it before creating a PLA job.",
+                    "Requested filament differs from the reviewed Meta draft. Revise the request and extract again.",
                     422,
                 )
         job = dict(
@@ -395,6 +407,8 @@ def create_job(body: Intake):
         if staged["file"]["source_format"] == "3mf":
             job["units"] = "mm"
         staged["consumed_by"] = job["id"]
+        if job["material"] != "PLA":
+            job["status"] = "awaiting_material_profile"
         put(c, "model_upload", staged)
         put(c, "job", job)
         audit(c, job["id"], "mesh_validated", job["file"])
@@ -447,68 +461,6 @@ async def stage_model(file: UploadFile = File(...)):
         )
         put(c, "model_upload", staged)
     return {"id": staged["id"], "file": metadata, "expires_at": staged["expires_at"]}
-
-
-@app.post("/api/model-repairs", status_code=201)
-async def attempt_model_repair(file: UploadFile = File(...)):
-    from backend.model_processing import process_upload
-
-    metadata, repaired, report = await process_upload(file, DATA, repair=True)
-    digest = metadata["sha256"]
-    with transaction() as c:
-        (DATA / (digest + ".stl")).write_bytes(repaired)
-        staged = dict(
-            id=uid(),
-            file=metadata,
-            expires_at=(now() + timedelta(hours=1)).isoformat(),
-            consumed_by=None,
-            repair_review_required=True,
-            repair_report=report,
-        )
-        put(c, "model_upload", staged)
-    return dict(
-        id=staged["id"],
-        file=metadata,
-        report=report,
-        approval_required=True,
-        download_url="/api/model-repairs/" + staged["id"] + "/file",
-    )
-
-
-@app.get("/api/model-repairs/{upload_id}/file")
-def download_repair(upload_id: str):
-    with engine.connect() as c:
-        staged = get(c, upload_id, "model_upload")
-        if not staged.get("repair_report") or parse(staged["expires_at"]) <= now():
-            fail("Repair preview missing or expired")
-        return FileResponse(
-            DATA / (staged["file"]["sha256"] + ".stl"),
-            filename="repaired-model.stl",
-            media_type="application/octet-stream",
-        )
-
-
-class RepairApproval(BaseModel):
-    confirmed: Literal[True]
-
-
-@app.post("/api/model-repairs/{upload_id}/approve")
-def approve_repaired_model(upload_id: str, body: RepairApproval):
-    with transaction() as c:
-        staged = get(c, upload_id, "model_upload")
-        if (
-            not staged.get("repair_report")
-            or staged["consumed_by"]
-            or parse(staged["expires_at"]) <= now()
-        ):
-            fail("Repair preview unavailable or expired")
-        staged["repair_review_required"] = False
-        put(c, "model_upload", staged)
-        return {
-            "id": staged["id"],
-            "file": staged["file"],
-            "expires_at": staged["expires_at"],
-        }
 
 
 @app.post("/api/jobs/{job_id}/file")
@@ -661,6 +613,11 @@ def comparison_project(quote_id: str):
 
 
 def build_quote(c, job, body: Estimates, provenance=None):
+    if job["material"] != "PLA":
+        fail(
+            "Configure verified matching filament profiles and material rates before quoting this request",
+            422,
+        )
     if job["status"] in ("scheduled", "recovery_required", "completed"):
         fail("Job is already committed")
     if not job["file"] or not job["units"]:
@@ -857,6 +814,11 @@ def slice_quote(job_id: str, body: SliceRequest, background: BackgroundTasks):
         fail("Bambu Studio executable is not configured", 503)
     with transaction() as c:
         job = get(c, job_id, "job")
+        if job["material"] != "PLA":
+            fail(
+                "Material profile and rates are not configured; PLA settings cannot be substituted",
+                422,
+            )
         for existing in rows(c, "task"):
             if existing["idempotency_key"] == body.idempotency_key:
                 if (

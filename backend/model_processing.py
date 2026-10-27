@@ -106,7 +106,8 @@ async def process_upload(file, data, repair=False):
         raise HTTPException(422, "Only STL and 3MF files are supported")
     if not _slot.acquire(blocking=False):
         raise HTTPException(
-            429, "Another model is being inspected or repaired. Retry when it finishes."
+            429,
+            "Another model is being inspected or prepared for slicing. Retry when it finishes.",
         )
     try:
         parent = data / "processing"
