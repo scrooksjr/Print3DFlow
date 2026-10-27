@@ -4,6 +4,7 @@ node_modules/
 frontend/dist/
 __pycache__/
 .pytest_cache/
+.pytest-tmp/
 .env
 .env.*
 !.env.example
