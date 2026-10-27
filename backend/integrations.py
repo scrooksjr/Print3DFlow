@@ -82,6 +82,7 @@ def extract_intake(
         "Never treat a color as an unsupported polymer. Preserve modified polymers such as PLA+ or silk PLA for review. "
         "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
+        "File color_inference contains assigned-slot colors only. Use its complete suggestion when text omits color; do not ask which color when the file establishes it. Unused palette colors are not assigned print colors. "
         "A selected_material is an explicit form choice. Use it when text omits material; ask for resolution if it conflicts with the text. "
         "File material_inference is a suggestion from assigned slots only, not from unused palette entries. Use an unambiguous suggestion if text omits material. Ask the supplied clarification for missing/conflicting mappings, and flag conflicts between the request and file suggestion. Never infer a material from color alone. "
         "Validated file context, when supplied, describes an attached local model. Do not ask for the object/file again. "
@@ -191,6 +192,22 @@ def extract_intake(
             if not draft.color or draft.color.lower() == color.lower():
                 draft.color = draft.color or color
                 draft.material = polymer.upper()
+    color_context = (file_context or {}).get("color_inference") or {}
+    if draft.color is None and color_context.get("suggested_color"):
+        draft.color = color_context["suggested_color"]
+    if (
+        color_context.get("suggested_color")
+        and draft.color
+        and draft.color.strip().lower()
+        == color_context["suggested_color"].strip().lower()
+    ):
+        draft.questions = [
+            q
+            for q in draft.questions
+            if not re.search(
+                r"\b(what|which)\s+colou?rs?\b|\bcolou?rs?\s+should\b", q, re.I
+            )
+        ]
     embedded = bool(file_context and file_context.get("format") == "3mf")
     vague_size = bool(
         re.search(r"\b(small|medium|large)(?:[ -]sized)?\b", request, re.I)

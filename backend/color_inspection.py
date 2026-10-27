@@ -241,7 +241,52 @@ class ColorInspection:
             note="Saved file intent only. Slots listed in a palette are not proof that every slot is used. Colors and physical filament mappings are not applied by the geometry-only slicer.",
         )
         result["material_inference"] = infer_material(result)
+        result["color_inference"] = infer_colors(result)
         return result
+
+
+def infer_colors(info):
+    saved = {f["slot"]: f.get("color") for f in info.get("saved_filaments", [])}
+    assigned = [
+        dict(slot=s, color=saved.get(s)) for s in info.get("assigned_slots", [])
+    ]
+    unresolved = (
+        info.get("painted_faces_detected")
+        or any(a.get("filament_slot") is None for a in info.get("assignments", []))
+        or any("unresolved" in r.lower() for r in info.get("block_reasons", []))
+    )
+    result = dict(
+        suggested_color=None,
+        assigned_colors=assigned,
+        status="needs_review",
+        clarification="Confirm the requested color(s); no complete assigned color mapping was found.",
+    )
+    if (
+        not unresolved
+        and assigned
+        and len(assigned) <= 4
+        and all(a["color"] for a in assigned)
+    ):
+        names = {
+            "#FFFFFFFF": "White",
+            "#000000FF": "Black",
+            "#FF0000FF": "Red",
+            "#00FF00FF": "Green",
+            "#0000FFFF": "Blue",
+            "#FFFF00FF": "Yellow",
+        }
+        colors = list(dict.fromkeys(a["color"] for a in assigned))
+
+        def label(color):
+            code = color[:7] if color.endswith("FF") else color
+            return names.get(color, code)
+
+        result.update(
+            suggested_color=" / ".join(label(c) for c in colors),
+            status="suggested",
+            clarification=None,
+        )
+    return result
 
 
 def infer_material(info):

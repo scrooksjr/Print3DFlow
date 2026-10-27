@@ -74,7 +74,7 @@ SHOP_TIMEZONE=America/New_York
 
 Use a Meta Model API key with access and credits for the configured Standard-mode model. Restart after editing. Do not put keys in the frontend, screenshots, issues, commits, or public reports. `.env.example` contains placeholders only.
 
-For intake, the request text, date/time context and validated file format, dimensions and embedded units (when a model is attached) are sent when the operator requests extraction. Filenames and model contents stay local. Vague sizes such as “medium” prompt an exact-dimension or original-size question; no resizing is performed. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
+For intake, the request text, date/time context and validated file format, dimensions, embedded units and assigned material/color suggestions (when a model is attached) are sent when the operator requests extraction. Filenames and model contents stay local. Vague sizes such as “medium” prompt an exact-dimension or original-size question; no resizing is performed. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
 
 ## Printer configuration
 
@@ -89,13 +89,15 @@ New jobs can request PLA, PETG, ABS, ASA or TPU, with color stored separately. M
 
 #### Four-color MVP inspection
 
+Saved colors and assignments are shown beside the requested-color field. A complete assigned-slot color set prefills that editable field; unresolved paint or missing mappings do not. Four palette entries alone do not imply four-color printing.
+
 The requested filament selector is suggested from **assigned 3MF slots only** when all referenced slots agree on one catalog material. Unused saved slots do not affect it. Missing, mixed, unsupported or unresolved assignments leave it unselected and ask for clarification. The field remains editable; changing a Meta-extracted material requires an explicit override confirmation before creating the job. This changes the request, not the uploaded color/tool mappings, and does not remove quote blocks. STL files leave the material unselected for user entry; user-written request text can still be extracted by Meta.
 
 3MF uploads show saved filament colors/materials, known object/part slot assignments and standard face-property references. Saved slots are listed separately from slots actually assigned to printable geometry; unused palette entries do not prove multicolor use. Encoded paint is detected but not decoded into verified physical mappings. The MVP limit is four assigned colors/filament slots; projects exceeding it are flagged and blocked.
 
 Multicolor, painted, textured or unresolved color/material assignments block **all** quoting paths, including manual estimates, native slicing and cross-printer comparisons. No verification override is provided yet: mapping and multicolor slicer-result verification must be implemented before enabling these quotes. Existing approval checks cannot bypass the block. Previously uploaded 3MFs without color inspection must be uploaded again before quoting. Single-filament projects with extra unused saved slots remain eligible when assignments are unambiguous.
 
-The import remains geometry-only for preview and slicing. Color metadata is displayed as file intent; saved paint is not rendered in the 3D preview or silently applied to a registered printer profile. STL files do not provide this 3MF assignment inspection. Meshes, palettes and assignments remain local; the Meta intake request still receives only the request and existing validated geometry context.
+The import remains geometry-only for preview and slicing. Color metadata is displayed as file intent; saved paint is not rendered in the 3D preview or silently applied to a registered printer profile. STL files do not provide this 3MF assignment inspection. Model geometry and full palettes stay local. On intake extraction, Meta also receives the complete assigned-slot color suggestion, when known, so it can avoid asking for a color already established by the file. Unused palette slots are not sent as assigned colors.
 
 Automatic repair is not offered. If a model fails geometry validation, repair it externally and upload the corrected STL or 3MF. No geometry is silently changed.
 

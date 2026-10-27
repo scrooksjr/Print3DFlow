@@ -333,11 +333,12 @@ def intake_draft(body: DraftRequest):
                 geometry_units="mm" if f["source_format"] == "3mf" else None,
             )
             if f["source_format"] == "3mf":
-                from backend.color_inspection import infer_material
+                from backend.color_inspection import infer_material, infer_colors
 
                 context["material_inference"] = infer_material(
                     f.get("color_info") or {}
                 )
+                context["color_inference"] = infer_colors(f.get("color_info") or {})
     try:
         result = integrations.extract_intake(
             body.request,
