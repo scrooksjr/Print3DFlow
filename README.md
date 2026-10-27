@@ -79,6 +79,14 @@ For intake, only the request text and date/time context are sent when the operat
 
 The public sample registry is `profiles/registry.example.json`. The application uses it when the ignored local `profiles/registry.json` does not exist. The sample resolves separately installed Bambu A1 system presets and is **not calibrated**.
 
+For your own **A1 or A1 mini**, save a single-part, single-plate PLA project with a 0.4 mm nozzle in Bambu Studio, then run:
+
+```powershell
+& .venv/Scripts/python.exe -m scripts.import_a1_profile 'C:/path/to/your-reference.3mf'
+```
+
+The importer identifies the model, validates its build volume, preserves the filament-slot mapping, and registers separate local printer capacity. It replaces source geometry with the owned sample block and keeps imported settings in ignored local files. Restart the app and verify a native sample slice against Bambu Studio before using estimates. This adds support for importing profiles; private shop profiles are not bundled. A2L is not configured.
+
 For supported X2D projects, import your own single-part, PLA, dual-0.4-mm-nozzle project from the repository root:
 
 ```powershell

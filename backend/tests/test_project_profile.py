@@ -44,6 +44,40 @@ def test_profile_preserves_slot_and_conservative_envelope(tmp_path):
 
 
 @pytest.mark.parametrize(
+    "machine,size", [("Bambu Lab A1", 256), ("Bambu Lab A1 mini", 180)]
+)
+def test_a1_project_preserves_slot_and_uses_single_tool_volume(tmp_path, machine, size):
+    profile = read_project(
+        project_file(
+            tmp_path,
+            printer_model=machine,
+            nozzle_diameter=["0.4"],
+            printable_area=["0x0", f"{size}x0", f"{size}x{size}", f"0x{size}"],
+            printable_height=str(size),
+            extruder_printable_area=[],
+            extruder_printable_height=[],
+        )
+    )
+    assert profile["filament_slot"] == 2
+    assert profile["bed_mm"] == [size, size, size]
+
+
+@pytest.mark.parametrize(
+    "change", [{"printable_height": "300"}, {"nozzle_diameter": ["0.6"]}]
+)
+def test_a1_invalid_configuration_is_rejected(tmp_path, change):
+    settings = dict(
+        printer_model="Bambu Lab A1",
+        nozzle_diameter=["0.4"],
+        printable_area=["0x0", "256x0", "256x256", "0x256"],
+        printable_height="256",
+    )
+    settings.update(change)
+    with pytest.raises(ValueError):
+        read_project(project_file(tmp_path, **settings))
+
+
+@pytest.mark.parametrize(
     "change",
     [
         {"printer_model": "Bambu Lab X1 Carbon"},

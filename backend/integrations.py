@@ -225,11 +225,11 @@ def load_profile(profile_id: str):
             project = read_project(project_path)
         except (OSError, ValueError, KeyError) as exc:
             raise IntegrationError(
-                "The registered X2D settings project is missing or invalid."
+                "The registered Bambu settings project is missing or invalid."
             ) from exc
         if profile["bed_mm"] != project["bed_mm"]:
             raise IntegrationError(
-                "Registry envelope does not match the X2D tool-envelope intersection."
+                "Registry envelope does not match the validated project build volume."
             )
         configs = {
             kind: project["settings"] for kind in ("machine", "process", "filament")

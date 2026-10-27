@@ -33,13 +33,19 @@ def read_project(path: Path):
         if b"<!DOCTYPE" in xml.upper() or b"<!ENTITY" in xml.upper():
             raise ValueError("XML declarations are not permitted in profile settings.")
         model = ET.fromstring(xml)
-    if settings.get("printer_model") != "Bambu Lab X2D":
-        raise ValueError("The project must contain the Bambu Lab X2D machine profile.")
+    machine = settings.get("printer_model")
+    if machine not in ("Bambu Lab X2D", "Bambu Lab A1", "Bambu Lab A1 mini"):
+        raise ValueError(
+            "Use a supported Bambu Lab X2D, A1 or A1 mini machine profile."
+        )
     if settings.get("post_process"):
         raise ValueError("Post-processing scripts are not permitted.")
     nozzles = settings.get("nozzle_diameter", [])
-    if nozzles != ["0.4", "0.4"]:
-        raise ValueError("This X2D adapter is validated only for two 0.4 mm nozzles.")
+    expected = ["0.4", "0.4"] if machine == "Bambu Lab X2D" else ["0.4"]
+    if nozzles != expected:
+        raise ValueError(
+            "The selected machine requires its supported 0.4 mm nozzle configuration."
+        )
     filaments = settings.get("filament_type", [])
     if not filaments or any(f != "PLA" for f in filaments):
         raise ValueError("Only PLA projects are supported.")
@@ -96,10 +102,14 @@ def read_project(path: Path):
         raise ValueError("Missing plate tool mapping.")
     # Use the intersection of both tool envelopes. Bambu additionally validates the
     # actual placement, exclusion zones, support, and skirt during each slice.
-    regions = settings.get("extruder_printable_area", [])
-    heights = [float(x) for x in settings.get("extruder_printable_height", [])]
-    if len(regions) != 2 or len(heights) != 2:
-        raise ValueError("Missing X2D per-tool build envelopes.")
+    if machine in ("Bambu Lab A1", "Bambu Lab A1 mini"):
+        regions = [",".join(settings.get("printable_area", []))]
+        heights = [float(settings.get("printable_height", 0))]
+    else:
+        regions = settings.get("extruder_printable_area", [])
+        heights = [float(x) for x in settings.get("extruder_printable_height", [])]
+        if len(regions) != 2 or len(heights) != 2:
+            raise ValueError("Missing X2D per-tool build envelopes.")
     boxes = []
     for region in regions:
         pts = [tuple(float(v) for v in pair.split("x")) for pair in region.split(",")]
@@ -113,6 +123,13 @@ def read_project(path: Path):
         }:
             raise ValueError("Only rectangular tool envelopes are supported.")
         boxes.append(box)
+    size = 180 if machine == "Bambu Lab A1 mini" else 256
+    if machine in ("Bambu Lab A1", "Bambu Lab A1 mini") and (
+        boxes != [(0, 0, size, size)] or heights != [size]
+    ):
+        raise ValueError(
+            "Unsupported build envelope for the selected A1-series machine."
+        )
     bed = [
         min(b[2] for b in boxes) - max(b[0] for b in boxes),
         min(b[3] for b in boxes) - max(b[1] for b in boxes),
