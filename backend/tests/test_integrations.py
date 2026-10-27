@@ -516,3 +516,20 @@ def test_live_bambu_slice_quote_reservation_and_recovery(client):
     recovery = client.post(f"/api/jobs/{key}/recovery").json()
     assert recovery["choice"]["printer_id"] != reserved["printer_id"]
     assert approve(client, recovery, "real-slice-recovery-approval").status_code == 200
+
+
+def test_selected_finish_resolves_repeated_question(client, monkeypatch):
+    sent = mock_meta(monkeypatch, draft_payload(questions=["What finish would you like?", "What is the deadline?"],finish=None))
+    r = client.post('/api/intake/drafts',json={'request':'Print three PLA keychains','requested_finish':'as-printed'})
+    assert r.status_code == 201
+    draft = r.json()['draft']
+    assert draft['finish'] == 'as-printed'
+    assert draft['questions'] == ['What is the deadline?']
+    assert json.loads(sent[0].content)['messages'][1]['content'].find('selected_finish') >= 0
+
+
+def test_conflicting_finish_still_requires_resolution(client, monkeypatch):
+    mock_meta(monkeypatch, draft_payload(finish='painting',questions=[]))
+    r = client.post('/api/intake/drafts',json={'request':'Print and paint three PLA keychains','requested_finish':'as-printed'})
+    assert r.json()['draft']['finish'] == 'painting'
+    assert any('finish' in q.lower() for q in r.json()['draft']['questions'])

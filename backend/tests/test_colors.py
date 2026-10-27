@@ -249,3 +249,13 @@ def test_preview_is_stored_separately_and_served_without_enabling_quotes(client)
     assert preview.status_code == 200 and preview.content.startswith(b'glTF')
     assert client.get('/api/jobs/'+jid+'/mesh').content[:4] != b'glTF'
     assert client.post('/api/jobs/'+jid+'/quotes',json=dict(confirmed=True,grams_per_part=1,hours_per_part=1)).status_code == 422
+
+
+def test_custom_finish_is_recorded_but_cannot_be_quoted_as_print_only(client):
+    staged = client.post('/api/model-uploads',files={'file':('single.3mf',color_project())}).json()
+    j = client.post('/api/jobs',json=dict(title='Painted request',quantity=1,material='PLA',finish='painting',units='mm',model_upload_id=staged['id'],deadline=(datetime.now(timezone.utc)+timedelta(days=3)).isoformat()))
+    assert j.status_code == 201 and j.json()['finish'] == 'painting'
+    jid = j.json()['id']
+    for ep,body in [('quotes',dict(confirmed=True,grams_per_part=1,hours_per_part=1)),('slice-quotes',dict(confirmed=True,profile_id='a1mini-pla-0.4-v1',idempotency_key='finish-block')),('comparisons',dict(confirmed=True,profile_ids=['a1-pla-0.4-v1']))]:
+        r = client.post('/api/jobs/'+jid+'/'+ep,json=body)
+        assert r.status_code == 422 and 'finishing' in r.text.lower()

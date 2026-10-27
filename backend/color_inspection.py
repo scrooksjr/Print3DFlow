@@ -361,6 +361,9 @@ def infer_material(info):
 def require_single_filament(job):
     from fastapi import HTTPException
 
+    if job.get("finish", "as-printed") != "as-printed":
+        raise HTTPException(422, "Requested finishing requires shop review and separate pricing before quoting or scheduling.")
+
     file = job.get("file") or {}
     info = file.get("color_info")
     if file.get("source_format") == "3mf" and info is None:

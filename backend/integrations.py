@@ -48,6 +48,7 @@ def extract_intake(
     reference_time: datetime | None = None,
     file_context=None,
     requested_material=None,
+    requested_finish=None,
 ):
     key = os.getenv("META_API_KEY", "").strip()
     if not key:
@@ -81,6 +82,7 @@ def extract_intake(
         "Separate polymer material from color: 'PLA white' means material PLA, color white. "
         "Never treat a color as an unsupported polymer. Preserve modified polymers such as PLA+ or silk PLA for review. "
         "'Print file as is' means as-printed finish unless the request conflicts; do not ask about finishing again. "
+        "selected_finish is an explicit form option. Use it when text omits finish and do not ask what finish is wanted again. Ask a conflict question if text requests a different finish. "
         "Flag conflicts and unsupported finishing requests; never silently substitute. "
         "File color_inference contains assigned-slot colors only. Use its complete suggestion when text omits color; do not ask which color when the file establishes it. Unused palette colors are not assigned print colors. "
         "A selected_material is an explicit form choice. Use it when text omits material; ask for resolution if it conflicts with the text. "
@@ -102,9 +104,10 @@ def extract_intake(
                         request=request,
                         validated_file=file_context,
                         selected_material=requested_material,
+                        selected_finish=requested_finish,
                     )
                 )
-                if file_context or requested_material
+                if file_context or requested_material or requested_finish
                 else request,
             },
         ],
@@ -156,6 +159,16 @@ def extract_intake(
         raise IntegrationError(
             "Meta returned an invalid draft. No job was changed; use manual intake or retry."
         ) from None
+    if requested_finish:
+        extracted = (draft.finish or "").strip().lower().replace("as printed", "as-printed")
+        if not extracted or extracted == requested_finish:
+            draft.finish = requested_finish
+            draft.questions = [q for q in draft.questions if not (
+                re.search(r"\bfinish(?:ing)?\b", q, re.I)
+                and re.search(r"\b(what|which)\b", q, re.I)
+                and not re.search(r"\b(conflict|different|instead|but)\b", q, re.I))]
+        else:
+            draft.questions.append("The finish in the request differs from the selected option. Confirm the intended finish and extract again.")
     if draft.material is None and requested_material:
         draft.material = requested_material
     inference = (file_context or {}).get("material_inference")

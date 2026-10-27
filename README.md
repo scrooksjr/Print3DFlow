@@ -236,3 +236,7 @@ Run `python scripts/check_public_files.py` after staging changes to check the pr
 ### Color-aware component preview
 
 New supported Bambu 3MF uploads preserve complete object/part filament-color assignments in a separate, bounded GLB preview generated in the isolated model worker. Rotate the preview to inspect both sides. Rendering uses saved component colors for visual review only; the normalized STL used for quoting is unchanged. Unsupported or incomplete mappings and encoded paint fall back to a labeled geometry-only view. Existing uploads need the original 3MF re-uploaded to generate a color preview. No multicolor quote gate is relaxed, and STL previews remain single-color. Preview artifacts stay in ignored local storage.
+
+### Requested finish
+
+New-job intake offers As-printed (no additional finishing), Sanding, Painting, and Other / discuss with shop. Select a finish before Meta extraction to avoid a repeated generic finish clarification; conflicting request text still requires resolution. Custom finishing has an additional cost. Requests are recorded, but non-as-printed jobs cannot receive automatic quotes or scheduling until the shop reviews the work and separately approves its price. The MVP does not yet provide a finishing-charge approval workflow. No finishing surcharge is invented or silently included in the print-only estimate.

@@ -221,6 +221,7 @@ class Intake(BaseModel):
     request: str = Field(default="", max_length=4000)
     quantity: int = Field(default=1, ge=1, le=100)
     material: Literal["PLA", "PETG", "ABS", "ASA", "TPU"] = "PLA"
+    finish: Literal["as-printed", "sanding", "painting", "other"] = "as-printed"
     color: str | None = Field(default=None, max_length=80)
     units: Literal["mm", "cm", "in"] | None = None
     deadline: datetime
@@ -310,6 +311,7 @@ def integration_status():
 
 
 class DraftRequest(BaseModel):
+    requested_finish: Literal["as-printed", "sanding", "painting", "other"] | None = None
     requested_material: Literal["PLA", "PETG", "ABS", "ASA", "TPU"] | None = None
     request: str = Field(min_length=5, max_length=4000)
     model_upload_id: str | None = None
@@ -344,6 +346,7 @@ def intake_draft(body: DraftRequest):
             body.request,
             file_context=context,
             requested_material=body.requested_material,
+            requested_finish=body.requested_finish,
         )
     except integrations.IntegrationError as exc:
         fail(str(exc), 503)
@@ -402,6 +405,10 @@ def create_job(body: Intake):
                     "Requested filament differs from the reviewed Meta draft. Revise the request and extract again.",
                     422,
                 )
+        if body.intake_draft_id and body.finish == "as-printed":
+            extracted_finish = (draft["draft"].get("finish") or "").strip().lower()
+            if extracted_finish and extracted_finish not in ("as-printed", "as printed", "none", "no finishing"):
+                fail("Finish conflicts with the Meta draft. Resolve the request and extract again before selecting as-printed.", 422)
         job = dict(
             id=uid(),
             **body.model_dump(mode="json"),
@@ -418,6 +425,8 @@ def create_job(body: Intake):
         staged["consumed_by"] = job["id"]
         if job["material"] != "PLA":
             job["status"] = "awaiting_material_profile"
+        if job["finish"] != "as-printed":
+            job["status"] = "awaiting_finish_review"
         put(c, "model_upload", staged)
         put(c, "job", job)
         audit(c, job["id"], "mesh_validated", job["file"])
@@ -441,7 +450,10 @@ def requirements(job_id: str, body: Intake):
         job = get(c, job_id, "job")
         if job["status"] in ("scheduled", "recovery_required", "completed"):
             fail("Scheduled jobs cannot change manufacturing requirements")
-        job.update(body.model_dump(mode="json"))
+        updates = body.model_dump(mode="json")
+        if "finish" not in body.model_fields_set:
+            updates.pop("finish", None)
+        job.update(updates)
         job["version"] += 1
         job["requirements_version"] += 1
         job["status"] = "needs_clarification" if body.units is None else "draft"
