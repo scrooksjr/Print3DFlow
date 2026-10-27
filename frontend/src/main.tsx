@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Box, Layers3, ArrowUpRight, Plus, Check, AlertTriangle, Clock3, Upload, ArrowRight, Activity, RotateCcw } from 'lucide-react';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader.js';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import './style.css';
@@ -23,17 +24,22 @@ async function api(path:string,body?:unknown,method='POST') {
 }
 function Mesh({job}:{job:RecordData}){
  const ref=useRef<HTMLDivElement>(null);
+ const [previewError,setPreviewError]=useState(false);
  useEffect(()=>{
   if(!ref.current||!job.file)return;
   const el=ref.current;const scene=new THREE.Scene();scene.background=new THREE.Color('#eef2ef');
   const camera=new THREE.PerspectiveCamera(40,el.clientWidth/240,0.1,10000);const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(el.clientWidth,240);renderer.setPixelRatio(Math.min(devicePixelRatio,2));el.appendChild(renderer.domElement);
   const controls=new OrbitControls(camera,renderer.domElement);scene.add(new THREE.HemisphereLight(0xffffff,0x587062,3));const light=new THREE.DirectionalLight(0xffffff,3);light.position.set(2,3,4);scene.add(light);
+  setPreviewError(false);let colored:THREE.Object3D|undefined;
   let geometry:THREE.BufferGeometry|undefined;const mat=new THREE.MeshStandardMaterial({color:'#e99a51',roughness:.55,metalness:.05});let disposed=false;
-  fetch('/api/jobs/'+job.id+'/mesh').then(r=>r.arrayBuffer()).then(buffer=>{if(disposed)return;geometry=new STLLoader().parse(buffer);geometry.center();geometry.computeBoundingSphere();const radius=geometry.boundingSphere?.radius||10;camera.position.set(radius*2,radius*1.5,radius*2.5);camera.near=radius/100;camera.far=radius*100;camera.updateProjectionMatrix();camera.lookAt(0,0,0);scene.add(new THREE.Mesh(geometry,mat));}).catch(()=>{});
+  const frameObject=(object:THREE.Object3D)=>{const box=new THREE.Box3().setFromObject(object);const center=box.getCenter(new THREE.Vector3());object.position.sub(center);const radius=Math.max(box.getSize(new THREE.Vector3()).length()/2,.01);camera.position.set(radius*2,radius*1.5,radius*2.5);camera.near=radius/100;camera.far=radius*100;camera.updateProjectionMatrix();camera.lookAt(0,0,0);scene.add(object);};
+  const loadPlain=()=>fetch('/api/jobs/'+job.id+'/mesh').then(r=>{if(!r.ok)throw Error('Preview unavailable');return r.arrayBuffer();}).then(buffer=>{if(disposed)return;geometry=new STLLoader().parse(buffer);frameObject(new THREE.Mesh(geometry,mat));});
+  if(job.file.preview_sha256){new GLTFLoader().load('/api/jobs/'+job.id+'/preview',gltf=>{colored=gltf.scene;if(disposed){colored.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.dispose());}});return;}let layer=0;colored.traverse(o=>{if(o instanceof THREE.Mesh){o.renderOrder=layer;const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>{m.side=THREE.DoubleSide;m.polygonOffset=true;m.polygonOffsetFactor=-layer;m.polygonOffsetUnits=-10*layer;if(m instanceof THREE.MeshStandardMaterial){m.roughness=.85;m.metalness=0;}});layer++;}});frameObject(colored);},undefined,()=>{if(!disposed){setPreviewError(true);loadPlain().catch(()=>setPreviewError(true));}});}
+  else loadPlain().catch(()=>{if(!disposed)setPreviewError(true);});
   let frame=0;const draw=()=>{frame=requestAnimationFrame(draw);controls.update();renderer.render(scene,camera);};draw();
-  return()=>{disposed=true;cancelAnimationFrame(frame);geometry?.dispose();mat.dispose();controls.dispose();renderer.dispose();el.replaceChildren();};
- },[job.id,job.file?.sha256]);
- return <div ref={ref} className="mesh" aria-label="Interactive STL preview. Drag to rotate."/>;
+  return()=>{disposed=true;cancelAnimationFrame(frame);geometry?.dispose();colored?.traverse(o=>{if(o instanceof THREE.Mesh){o.geometry.dispose();const mats=Array.isArray(o.material)?o.material:[o.material];mats.forEach(m=>m.dispose());}});mat.dispose();controls.dispose();renderer.dispose();el.replaceChildren();};
+ },[job.id,job.file?.sha256,job.file?.preview_sha256]);
+ return <><div ref={ref} className="mesh" aria-label="Interactive model preview. Drag to rotate to inspect both sides."/><p className="form-note">{job.file?.preview_sha256&&!previewError?'Saved component filament colors shown for visual review only. Drag to rotate and inspect the logo and QR sides.':'Geometry-only preview. Color mapping unavailable or unsupported; re-upload the original 3MF for supported component colors.'} Preview colors do not verify physical filament mappings or enable multicolor quoting.</p></>;
 }
 function App(){
  const [data,setData]=useState(empty),[selected,setSelected]=useState(''),[tab,setTab]=useState('workspace'),[modal,setModal]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[busy,setBusy]=useState(false);

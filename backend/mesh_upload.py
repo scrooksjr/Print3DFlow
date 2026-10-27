@@ -80,6 +80,7 @@ def import_3mf(content):
         color_inspector = ColorInspection(read, names, root_path, settings)
         docs = {}
         meshes = []
+        preview_keys = []
         triangles = 0
 
         def document(name):
@@ -154,6 +155,7 @@ def import_3mf(content):
                 mesh = trimesh.Trimesh(vertices=verts, faces=indices, process=True)
                 mesh.apply_transform(matrix)
                 meshes.append(mesh)
+                preview_keys.append((name, oid, stack))
             else:
                 color_inspector.object(name, obj, [])
                 components = obj.findall(
@@ -189,6 +191,24 @@ def import_3mf(content):
             raise MeshImportError("No printable geometry")
         # One uploaded assembly is one quoted unit; preserve relative placement.
         result = trimesh.util.concatenate(meshes)
-        result.metadata["color_info"] = color_inspector.summary()
+        info = color_inspector.summary()
+        result.metadata["color_info"] = info
+        # Render saved component intent only. Never infer opaque painted mappings.
+        preview_colors = []
+        for name, oid, stack in preview_keys:
+            candidates = [a.get("color") for a in info["assignments"]
+                          if a.get("source") == "Bambu object/part"
+                          and a.get("part_id") == oid
+                          and (root_path, a.get("object_id")) in (*stack, (name, oid))]
+            colors = set(candidates)
+            preview_colors.append(next(iter(colors)) if len(colors) == 1 else None)
+        if (not info["painted_faces_detected"] and not color_inspector.references
+                and not info["exceeds_mvp_limit"] and all(preview_colors)):
+            for mesh, color in zip(meshes, preview_colors):
+                mesh.visual.vertex_colors = [int(color[i:i + 2], 16) for i in (1, 3, 5, 7)]
+            colored = trimesh.Scene()
+            for index, mesh in enumerate(meshes):
+                colored.add_geometry(mesh, node_name=f"component-{index}")
+            result.metadata["preview_glb"] = colored.export(file_type="glb")
         result.metadata["embedded_units"] = root.get("unit", "millimeter")
         return result

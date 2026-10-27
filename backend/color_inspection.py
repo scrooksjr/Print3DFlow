@@ -245,6 +245,45 @@ class ColorInspection:
         return result
 
 
+def color_name(color):
+    """Broad display names for saved RGB colors, not manufacturer shade matches."""
+    from colorsys import rgb_to_hsv
+
+    code = color.lstrip("#")
+    if len(code) not in (6, 8):
+        return color
+    try:
+        r, g, b = (int(code[i:i + 2], 16) / 255 for i in (0, 2, 4))
+        alpha = int(code[6:8], 16) if len(code) == 8 else 255
+    except ValueError:
+        return color
+    hue, saturation, value = rgb_to_hsv(r, g, b)
+    hue *= 360
+    if value < 0.15:
+        name = "Black"
+    elif saturation < 0.12:
+        name = "White" if value > 0.9 else "Gray"
+    elif 15 <= hue < 50 and value < 0.65:
+        name = "Brown"
+    elif hue < 15 or hue >= 345:
+        name = "Red"
+    elif hue < 45:
+        name = "Orange"
+    elif hue < 70:
+        name = "Yellow"
+    elif hue < 165:
+        name = "Green"
+    elif hue < 195:
+        name = "Cyan"
+    elif hue < 255:
+        name = "Blue"
+    elif hue < 320:
+        name = "Purple"
+    else:
+        name = "Pink"
+    return ("Transparent " if alpha < 255 else "") + name
+
+
 def infer_colors(info):
     saved = {f["slot"]: f.get("color") for f in info.get("saved_filaments", [])}
     assigned = [
@@ -267,22 +306,10 @@ def infer_colors(info):
         and len(assigned) <= 4
         and all(a["color"] for a in assigned)
     ):
-        names = {
-            "#FFFFFFFF": "White",
-            "#000000FF": "Black",
-            "#FF0000FF": "Red",
-            "#00FF00FF": "Green",
-            "#0000FFFF": "Blue",
-            "#FFFF00FF": "Yellow",
-        }
         colors = list(dict.fromkeys(a["color"] for a in assigned))
 
-        def label(color):
-            code = color[:7] if color.endswith("FF") else color
-            return names.get(color, code)
-
         result.update(
-            suggested_color=" / ".join(label(c) for c in colors),
+            suggested_color=" / ".join(color_name(c) for c in colors),
             status="suggested",
             clarification=None,
         )

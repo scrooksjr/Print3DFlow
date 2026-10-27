@@ -11,7 +11,7 @@ from backend import mesh_upload
 from backend.model_limits import MAX_NORMALIZED_BYTES
 
 
-def inspect(content, filename, repair=False):
+def inspect(content, filename, repair=False, preview_path=None):
     extension = Path(filename).suffix.lower()
     if extension == ".3mf":
         mesh = mesh_upload.import_3mf(content)
@@ -58,4 +58,8 @@ def inspect(content, filename, repair=False):
         if extension == ".3mf"
         else "STL units require operator confirmation",
     )
+    preview = mesh.metadata.get("preview_glb")
+    if preview and preview_path is not None and len(preview) <= MAX_NORMALIZED_BYTES:
+        Path(preview_path).write_bytes(preview)
+        metadata["preview_sha256"] = hashlib.sha256(preview).hexdigest()
     return metadata, normalized, None

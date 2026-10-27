@@ -130,6 +130,16 @@ async def process_upload(file, data, repair=False):
             (directory / "request.json").write_text(
                 json.dumps(dict(filename=filename, repair=repair)), encoding="utf-8"
             )
-            return await run_in_threadpool(execute_worker, directory, repair)
+            result = await run_in_threadpool(execute_worker, directory, repair)
+            preview_hash = result[0].get("preview_sha256")
+            if preview_hash:
+                preview = directory / "preview.glb"
+                if not preview.is_file() or preview.stat().st_size > MAX_NORMALIZED_BYTES:
+                    raise HTTPException(422, "Color preview exceeds processing limits")
+                import hashlib
+                if hashlib.sha256(preview.read_bytes()).hexdigest() != preview_hash:
+                    raise HTTPException(422, "Color preview integrity check failed")
+                shutil.copyfile(preview, data / (preview_hash + ".glb"))
+            return result
     finally:
         _slot.release()

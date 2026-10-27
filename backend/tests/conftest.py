@@ -21,7 +21,8 @@ def client(tmp_path, monkeypatch):
         config = json.loads((directory / "request.json").read_text(encoding="utf-8"))
         try:
             return inspect(
-                (directory / "input.model").read_bytes(), config["filename"], repair
+                (directory / "input.model").read_bytes(), config["filename"], repair,
+                preview_path=directory / "preview.glb"
             )
         except MeshImportError as exc:
             raise HTTPException(422, str(exc)) from None

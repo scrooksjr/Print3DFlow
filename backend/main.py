@@ -1306,6 +1306,16 @@ def outage(body: Outage):
         return event
 
 
+@app.get("/api/jobs/{job_id}/preview")
+def color_preview(job_id: str):
+    with engine.connect() as c:
+        job = get(c, job_id, "job")
+        fingerprint = (job.get("file") or {}).get("preview_sha256")
+        if not fingerprint or not (DATA / (fingerprint + ".glb")).is_file():
+            fail("Color preview unavailable; re-upload the original 3MF", 404)
+        return FileResponse(DATA / (fingerprint + ".glb"), media_type="model/gltf-binary")
+
+
 @app.get("/api/jobs/{job_id}/mesh")
 def mesh_file(job_id: str):
     with engine.connect() as c:

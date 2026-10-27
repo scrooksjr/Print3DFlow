@@ -200,4 +200,52 @@ def test_real_worker_preserves_four_color_metadata(tmp_path):
     metadata, normalized, _ = execute_worker(tmp_path)
     assert metadata["color_info"]["assigned_slots"] == [1, 2, 3, 4]
     assert metadata["color_info"]["quoting_blocked"]
+    assert metadata["preview_sha256"]
+    assert (tmp_path / "preview.glb").read_bytes().startswith(b"glTF")
     assert not normalized.startswith(b"PK")
+
+
+def test_assigned_shades_use_readable_names_without_changing_exact_colors():
+    from backend.color_inspection import infer_colors
+
+    shades = ["#161616FF", "#FFFFFFFF", "#FFF144FF", "#0ACC38FF"]
+    info = dict(saved_filaments=[dict(slot=i + 1, color=c) for i, c in enumerate(shades)],
+                assigned_slots=[1, 2, 3, 4], assignments=[], block_reasons=[])
+    result = infer_colors(info)
+    assert result["suggested_color"] == "Black / White / Yellow / Green"
+    assert [c["color"] for c in result["assigned_colors"]] == shades
+    info["assigned_slots"] = [4]
+    assert infer_colors(info)["suggested_color"] == "Green"
+    info["painted_faces_detected"] = True
+    assert infer_colors(info)["suggested_color"] is None
+
+
+def test_color_name_handles_shades_and_opacity():
+    from backend.color_inspection import color_name
+
+    for code, name in {"#FFE000FF": "Yellow", "#75B52AFF": "Green",
+                       "#808080FF": "Gray", "#FFA500FF": "Orange",
+                       "#800080FF": "Purple", "#0000FF80": "Transparent Blue"}.items():
+        assert color_name(code) == name
+
+
+def test_component_preview_preserves_color_and_geometry_and_quote_block():
+    mesh = import_3mf(color_project(slots=(1, 2, 3, 4)))
+    import trimesh
+    scene = trimesh.load(io.BytesIO(mesh.metadata["preview_glb"]), file_type="glb")
+    geometry = scene.to_geometry()
+    assert len(geometry.faces) == len(mesh.faces)
+    assert set(map(tuple, geometry.visual.vertex_colors)) == {
+        (255, 0, 0, 255), (0, 255, 0, 255), (0, 0, 255, 255), (255, 255, 255, 255)}
+    assert mesh.metadata["color_info"]["quoting_blocked"]
+    for data in (color_project(paint=True), color_project(slots=())):
+        assert "preview_glb" not in import_3mf(data).metadata
+
+
+def test_preview_is_stored_separately_and_served_without_enabling_quotes(client):
+    staged = client.post('/api/model-uploads', files={'file':('colored.3mf',color_project(slots=(1,2,3,4)))}).json()
+    jid = client.post('/api/jobs',json=dict(title='Color preview',quantity=1,material='PLA',units='mm',model_upload_id=staged['id'],deadline=(datetime.now(timezone.utc)+timedelta(days=3)).isoformat())).json()['id']
+    preview = client.get('/api/jobs/'+jid+'/preview')
+    assert preview.status_code == 200 and preview.content.startswith(b'glTF')
+    assert client.get('/api/jobs/'+jid+'/mesh').content[:4] != b'glTF'
+    assert client.post('/api/jobs/'+jid+'/quotes',json=dict(confirmed=True,grams_per_part=1,hours_per_part=1)).status_code == 422

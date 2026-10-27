@@ -89,7 +89,7 @@ New jobs can request PLA, PETG, ABS, ASA or TPU, with color stored separately. M
 
 #### Four-color MVP inspection
 
-Saved colors and assignments are shown beside the requested-color field. A complete assigned-slot color set prefills that editable field; unresolved paint or missing mappings do not. Four palette entries alone do not imply four-color printing.
+Saved colors and assignments are shown beside the requested-color field. Assigned RGB shades are summarized with broad color names (for example, Black / White / Yellow / Green); these are editable descriptions, not manufacturer shade matches. Exact saved hex values remain in the palette. A complete assigned-slot color set prefills that editable field; unresolved paint or missing mappings do not. Four palette entries alone do not imply four-color printing.
 
 The requested filament selector is suggested from **assigned 3MF slots only** when all referenced slots agree on one catalog material. Unused saved slots do not affect it. Missing, mixed, unsupported or unresolved assignments leave it unselected and ask for clarification. The field remains editable; changing a Meta-extracted material requires an explicit override confirmation before creating the job. This changes the request, not the uploaded color/tool mappings, and does not remove quote blocks. STL files leave the material unselected for user entry; user-written request text can still be extracted by Meta.
 
@@ -97,7 +97,7 @@ The requested filament selector is suggested from **assigned 3MF slots only** wh
 
 Multicolor, painted, textured or unresolved color/material assignments block **all** quoting paths, including manual estimates, native slicing and cross-printer comparisons. No verification override is provided yet: mapping and multicolor slicer-result verification must be implemented before enabling these quotes. Existing approval checks cannot bypass the block. Previously uploaded 3MFs without color inspection must be uploaded again before quoting. Single-filament projects with extra unused saved slots remain eligible when assignments are unambiguous.
 
-The import remains geometry-only for preview and slicing. Color metadata is displayed as file intent; saved paint is not rendered in the 3D preview or silently applied to a registered printer profile. STL files do not provide this 3MF assignment inspection. Model geometry and full palettes stay local. On intake extraction, Meta also receives the complete assigned-slot color suggestion, when known, so it can avoid asking for a color already established by the file. Unused palette slots are not sent as assigned colors.
+The slicing input remains a normalized geometry-only STL. A separate preview renders supported saved component colors for new uploads as file intent; opaque paint is not decoded and no saved mappings are silently applied to a registered printer profile. STL files do not provide this 3MF assignment inspection. Model geometry and full palettes stay local. On intake extraction, Meta also receives the complete assigned-slot color suggestion, when known, so it can avoid asking for a color already established by the file. Unused palette slots are not sent as assigned colors.
 
 Automatic repair is not offered. If a model fails geometry validation, repair it externally and upload the corrected STL or 3MF. No geometry is silently changed.
 
@@ -149,7 +149,7 @@ A subsequent isolated run passed **13 browser and API checks** using an original
 - The browser displayed the multicolor verification block and hid quote controls. Manual estimates, native slice quotes and cross-printer comparisons each rejected the unverified multicolor job with **HTTP 422**.
 - No quotes or reservations were created. The source file and main workspace were unchanged, and no physical printer was contacted.
 
-These checks include overlapping UI observations and API assertions. The preview uses a single display color; saved colors appear in the palette, not as rendered paint on the model. This run did not call Meta, perform a successful multicolor slice or verify physical print accuracy. It used an isolated test workspace with default demo pricing. The original model, screenshots and raw report remain private; only this summary is published.
+These checks include overlapping UI observations and API assertions. At the time of this run, the preview used a single display color and saved colors appeared only in the palette. The newer component-color preview is described below. This run did not call Meta, perform a successful multicolor slice or verify physical print accuracy. It used an isolated test workspace with default demo pricing. The original model, screenshots and raw report remain private; only this summary is published.
 
 ### Verified assigned-color autofill and palette display
 
@@ -232,3 +232,7 @@ This is an **unauthenticated loopback-only operator prototype**. It does not syn
 - **Local only:** API keys, databases, jobs, rate cards, imported printer settings, raw outputs, screenshots, customer files, internal plans, and shop-specific demo scripts.
 
 Run `python scripts/check_public_files.py` after staging changes to check the proposed commit for excluded paths and known local credential values. It reports filenames and failure categories, never matching credential contents. It is a safeguard, not permission to publish unreviewed customer data.
+
+### Color-aware component preview
+
+New supported Bambu 3MF uploads preserve complete object/part filament-color assignments in a separate, bounded GLB preview generated in the isolated model worker. Rotate the preview to inspect both sides. Rendering uses saved component colors for visual review only; the normalized STL used for quoting is unchanged. Unsupported or incomplete mappings and encoded paint fall back to a labeled geometry-only view. Existing uploads need the original 3MF re-uploaded to generate a color preview. No multicolor quote gate is relaxed, and STL previews remain single-color. Preview artifacts stay in ignored local storage.

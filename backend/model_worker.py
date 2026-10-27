@@ -111,7 +111,8 @@ def main():
         try:
             phase = "inspection"
             metadata, normalized, report = inspect(
-                source.read_bytes(), config["filename"], config["repair"]
+                source.read_bytes(), config["filename"], config["repair"],
+                preview_path=directory / "preview.glb"
             )
         except MeshImportError as exc:
             result = dict(ok=False, error=str(exc))
