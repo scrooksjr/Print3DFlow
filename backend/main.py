@@ -613,6 +613,9 @@ def comparison_project(quote_id: str):
 
 
 def build_quote(c, job, body: Estimates, provenance=None):
+    from backend.color_inspection import require_single_filament
+
+    require_single_filament(job)
     if job["material"] != "PLA":
         fail(
             "Configure verified matching filament profiles and material rates before quoting this request",
@@ -707,6 +710,9 @@ def quote(job_id: str, body: Estimates):
 
 
 def valid_quote(c, job):
+    from backend.color_inspection import require_single_filament
+
+    require_single_filament(job)
     if not job.get("latest_quote_id"):
         fail("Create a quote first")
     q = get(c, job["latest_quote_id"], "quote")
@@ -806,6 +812,10 @@ def slice_worker(task_id: str):
 
 @app.post("/api/jobs/{job_id}/slice-quotes", status_code=202)
 def slice_quote(job_id: str, body: SliceRequest, background: BackgroundTasks):
+    from backend.color_inspection import require_single_filament
+
+    with transaction() as c:
+        require_single_filament(get(c, job_id, "job"))
     try:
         profile, _, fingerprint = integrations.load_profile(body.profile_id)
     except integrations.IntegrationError as exc:
@@ -819,6 +829,9 @@ def slice_quote(job_id: str, body: SliceRequest, background: BackgroundTasks):
                 "Material profile and rates are not configured; PLA settings cannot be substituted",
                 422,
             )
+        from backend.color_inspection import require_single_filament
+
+        require_single_filament(job)
         for existing in rows(c, "task"):
             if existing["idempotency_key"] == body.idempotency_key:
                 if (

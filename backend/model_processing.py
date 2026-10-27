@@ -56,7 +56,11 @@ def invoke_worker(directory, repair=False):
             503, "Model worker could not start; retry or review the installation"
         ) from None
     response = directory / "response.json"
-    if result.returncode or not response.is_file() or response.stat().st_size > 32768:
+    if (
+        result.returncode
+        or not response.is_file()
+        or response.stat().st_size > 128 * 1024
+    ):
         raise HTTPException(
             422,
             "Model worker stopped or exceeded its memory limit. Simplify the model.",

@@ -10,6 +10,7 @@ import {QuotingPanel} from './QuotingPanel';
 import {ShopRates} from './ShopRates';
 import {RecoveryExplanation} from './RecoveryExplanation';
 import {PrinterComparison} from './PrinterComparison';
+import {ModelColors} from './ModelColors';
 
 type RecordData = Record<string, any>;
 const empty = {jobs:[],printers:[],quotes:[],proposals:[],reservations:[],outages:[],audit:[],tasks:[]} as Record<string,RecordData[]>;
@@ -65,6 +66,7 @@ function App(){
  <div className="section-label"><span>01</span> Geometry & requirements</div>{!job.units&&<div className="clarification"><b>Confirm the model units</b><p>STL files do not reliably specify units. Confirm the intended scale before quoting.</p><select aria-label="model units" value={unit} onChange={e=>setUnit(e.target.value)}><option value="mm">Millimeters</option><option value="cm">Centimeters</option><option value="in">Inches</option></select><button className="secondary" disabled={busy} onClick={()=>run(()=>api('/jobs/'+job.id+'/requirements',{title:job.title,request:job.request,quantity:job.quantity,material:job.material,color:job.color,deadline:job.deadline,units:unit},'PATCH'))}>Confirm units</button></div>}
  {job.file?<><Mesh job={job}/>{job.file.source_format==='3mf'&&<p className="form-note">{job.file.import_note}</p>}<div className="mesh-info"><span><Check size={14}/> {job.file.filename}</span><span>{job.file.triangles} triangles · {job.units||'units unconfirmed'}</span></div></>:<label className={'upload '+(busy?'disabled':'')}><Upload size={24}/><b>Drop in your next print</b><span>Choose a watertight STL · up to 64 MiB</span><input type="file" accept=".stl,.3mf" disabled={busy} onChange={e=>upload(e.target.files?.[0])}/></label>}
  {job.material!=='PLA'&&<div className="clarification"><b>{job.material} profile setup required</b><p>Request recorded. Before quoting, configure a saved {job.material} Bambu project for each compatible printer, its material cost, and a verified sample slice. Existing PLA settings and rates will not be used.</p></div>}
+ {job.file&&<ModelColors file={job.file}/>}
  <QuotingPanel key={job.id} job={job} quote={quote} tasks={data.tasks} slicer={integrations.slicer} busy={busy} run={run} request={api}/>
  <PrinterComparison key={'compare-'+job.id} job={job} profiles={integrations.slicer.profiles} configured={integrations.meta.configured} busy={busy} run={run} request={api}/>
  <div className="section-label"><span>03</span> Production plan</div>{job.status==='quote_ready'&&<button className="primary full" disabled={busy} onClick={()=>run(()=>api('/jobs/'+job.id+'/proposals'),'Capacity checked. Review and approve the proposed reservation.')}>Find a printer slot <ArrowRight size={16}/></button>}

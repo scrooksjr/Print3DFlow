@@ -87,6 +87,14 @@ New jobs can request PLA, PETG, ABS, ASA or TPU, with color stored separately. M
 
 ### STL and 3MF job uploads
 
+#### Four-color MVP inspection
+
+3MF uploads show saved filament colors/materials, known object/part slot assignments and standard face-property references. Saved slots are listed separately from slots actually assigned to printable geometry; unused palette entries do not prove multicolor use. Encoded paint is detected but not decoded into verified physical mappings. The MVP limit is four assigned colors/filament slots; projects exceeding it are flagged and blocked.
+
+Multicolor, painted, textured or unresolved color/material assignments block **all** quoting paths, including manual estimates, native slicing and cross-printer comparisons. No verification override is provided yet: mapping and multicolor slicer-result verification must be implemented before enabling these quotes. Existing approval checks cannot bypass the block. Previously uploaded 3MFs without color inspection must be uploaded again before quoting. Single-filament projects with extra unused saved slots remain eligible when assignments are unambiguous.
+
+The import remains geometry-only for preview and slicing. Color metadata is displayed as file intent; saved paint is not rendered in the 3D preview or silently applied to a registered printer profile. STL files do not provide this 3MF assignment inspection. Meshes, palettes and assignments remain local; the Meta intake request still receives only the request and existing validated geometry context.
+
 Automatic repair is not offered. If a model fails geometry validation, repair it externally and upload the corrected STL or 3MF. No geometry is silently changed.
 
 Creating a new job requires a validated model file. The UI stages the upload through `POST /api/model-uploads`, then passes the returned single-use `model_upload_id` to `POST /api/jobs`. Missing, expired, consumed or invalid uploads cannot create a job. Staged uploads expire after one hour; Meta extraction alone remains a draft and creates no job.

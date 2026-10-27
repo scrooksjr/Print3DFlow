@@ -49,6 +49,7 @@ def inspect(content, filename, repair=False):
         triangles=len(mesh.faces),
         watertight=bool(mesh.is_watertight),
         source_format=extension[1:],
+        color_info=mesh.metadata.get("color_info") if extension == ".3mf" else None,
         source_sha256=hashlib.sha256(content).hexdigest(),
         embedded_units=mesh.metadata.get("embedded_units")
         if extension == ".3mf"

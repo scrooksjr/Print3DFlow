@@ -67,6 +67,7 @@ def import_3mf(content):
             return result
 
         root_path = path(targets[0])
+        settings = None
         if "Metadata/model_settings.config" in names:
             settings = xml(read("Metadata/model_settings.config"))
             if any(
@@ -74,6 +75,9 @@ def import_3mf(content):
                 for p in settings.findall(".//part")
             ):
                 raise MeshImportError("3MF modifiers require manual review")
+        from backend.color_inspection import ColorInspection
+
+        color_inspector = ColorInspection(read, names, root_path, settings)
         docs = {}
         meshes = []
         triangles = 0
@@ -89,6 +93,7 @@ def import_3mf(content):
                 resources = root.find("{" + CORE + "}resources")
                 if resources is None:
                     raise MeshImportError("Missing resources")
+                color_inspector.document(name, resources)
                 docs[name] = (
                     root,
                     scale,
@@ -124,6 +129,7 @@ def import_3mf(content):
                 faces = geometry.findall(
                     "{" + CORE + "}triangles/{" + CORE + "}triangle"
                 )
+                color_inspector.object(name, obj, faces)
                 triangles += len(faces)
                 if triangles > MAX_TRIANGLES:
                     raise MeshImportError(
@@ -149,6 +155,7 @@ def import_3mf(content):
                 mesh.apply_transform(matrix)
                 meshes.append(mesh)
             else:
+                color_inspector.object(name, obj, [])
                 components = obj.findall(
                     "{" + CORE + "}components/{" + CORE + "}component"
                 )
@@ -182,5 +189,6 @@ def import_3mf(content):
             raise MeshImportError("No printable geometry")
         # One uploaded assembly is one quoted unit; preserve relative placement.
         result = trimesh.util.concatenate(meshes)
+        result.metadata["color_info"] = color_inspector.summary()
         result.metadata["embedded_units"] = root.get("unit", "millimeter")
         return result

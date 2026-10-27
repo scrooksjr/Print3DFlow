@@ -323,6 +323,9 @@ def register(app):
             m.fail("Select imported A1, A1 mini or X2D profiles", 422)
         with m.transaction() as c:
             job = m.get(c, job_id, "job")
+            from backend.color_inspection import require_single_filament
+
+            require_single_filament(job)
             if (
                 job["status"]
                 not in ("draft", "ready_for_quote", "quote_ready", "recovery_required")

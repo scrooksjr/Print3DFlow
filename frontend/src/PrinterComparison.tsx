@@ -9,7 +9,7 @@ export function PrinterComparison({job,profiles,configured,busy,run,request}:Pro
  async function refresh(){const r=await fetch('/api/jobs/'+job.id+'/comparisons');if(r.ok)setBatch(await r.json());}
  useEffect(()=>{refresh();const t=setInterval(refresh,3000);return()=>clearInterval(t);},[job.id,job.version,job.latest_quote_id]);
  useEffect(()=>{setApproved(false);setSelected('');setShareTotals(false);},[batch.id,batch.status]);
- if(!job.file||!job.units||!['draft','ready_for_quote','quote_ready','recovery_required'].includes(job.status))return null;
+ if(!job.file||job.file.color_info?.quoting_blocked||!job.units||!['draft','ready_for_quote','quote_ready','recovery_required'].includes(job.status))return null;
  const running=working||['queued','running'].includes(batch.status);
  const option=batch.options?.find((o:Data)=>o.option_id===selected);
  async function start(){setWorking(true);const result=await run(()=>request('/jobs/'+job.id+'/comparisons',{confirmed:true,profile_ids:selectedProfiles,support_percent_by_profile:Object.fromEntries(Object.entries(supports).filter(([pid,v])=>selectedProfiles.includes(pid)&&v.trim()!=='').map(([pid,v])=>[pid,Number(v)]))}),'Independent slices requested. Current quote and reservations unchanged.');if(result)setBatch(result);setWorking(false);setApproved(false);}
