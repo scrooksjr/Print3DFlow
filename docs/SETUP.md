@@ -20,6 +20,16 @@ Local `profiles/registry.json` takes precedence over the public example. `SLICER
 
 **Compare with Bambu Studio** records one-part estimates from the same mesh, units, orientation, plate, and process. Use total estimated time, including preparation. A quote's matching-3MF download can help reproduce its placement. Percentage tolerances are review criteria, not confidence intervals or physical calibration claims.
 
+## Meta recovery explanations
+
+After **Propose recovery**, choose **Explain recovery options with Meta**. The provider receives only verified option IDs, times, deadline status, delay/slack figures, and allowed reason codes. Customer text, printer names, uploaded meshes, outage-reason text, price amounts, and rate cards are not sent for this step.
+
+The structured response must cover every option, recommend only a verified on-time option (or none when all are late), and select only reason codes justified by that option. The server renders the selected reasons with verified facts. The model has no reservation tools and cannot insert unverified prose, slots, prices, or commands into the displayed explanation.
+
+Explanations are cached against the proposal, quote, job version, relevant printer configuration, reservations, and outages. Capacity changes during the provider call discard the response. Later changes mark it stale; approval checks again and blocks stale explanations. A model outage does not fabricate a fallback explanation: operators may review a fresh verified proposal manually. Customer updates remain templates/drafts and are not sent.
+
+Selecting an alternative changes only the uncommitted proposal. **Approve recovery** is still required to change reservations. For a single compatible printer, the model must not imply another printer is available. App estimate/price policy and profile compatibility are unchanged.
+
 ## Development and privacy
 
 For frontend development, start the backend on port 8765 and run `pnpm --dir frontend dev`. The Vite proxy forwards local `/api` requests. Use synthetic customer data. The app has no authentication; do not expose it on a public network.

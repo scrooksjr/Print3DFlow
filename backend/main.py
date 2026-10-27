@@ -28,6 +28,7 @@ from sqlalchemy import (
     text,
 )
 from backend import integrations
+from backend import recovery as recovery_ai
 from backend.pricing import RateCard, calculate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -884,6 +885,9 @@ def proposal(c, job, recovery=False):
     choices = slots(c, job, q, old["id"] if old else None)
     if not choices:
         fail("No compatible printer; manual review required", 422)
+    choices = [
+        dict(option_id=f"option-{i + 1}", **option) for i, option in enumerate(choices)
+    ]
     chosen = choices[0]
     result = dict(
         id=uid(),
@@ -932,6 +936,138 @@ def recover(job_id: str):
         return proposal(c, job, True)
 
 
+def verified_recovery(c, p):
+    job = get(c, p["job_id"], "job")
+    if (
+        p["kind"] != "recovery"
+        or p["status"] != "proposed"
+        or job["status"] != "recovery_required"
+        or p["job_version"] != job["version"]
+        or parse(p["expires_at"]) <= now()
+    ):
+        fail("Recovery proposal is stale; generate a new proposal.")
+    q = valid_quote(c, job)
+    if q["id"] != p["quote_id"] or not all(
+        "option_id" in o for o in [p["choice"], *p["alternatives"]]
+    ):
+        fail("Recovery inputs changed; generate a new proposal.")
+    old = get(c, p["old_reservation"]["id"], "reservation")
+    try:
+        return recovery_ai.snapshot(
+            p,
+            job,
+            q,
+            old,
+            rows(c, "printer"),
+            rows(c, "reservation"),
+            rows(c, "outage"),
+            now(),
+        )
+    except ValueError as exc:
+        fail(str(exc))
+
+
+@app.post("/api/proposals/{proposal_id}/explanation")
+def explain_recovery(proposal_id: str):
+    with transaction() as c:
+        p = get(c, proposal_id, "proposal")
+        verified = verified_recovery(c, p)
+        if p.get("explanation_id"):
+            cached = get(c, p["explanation_id"], "recovery_explanation")
+            if cached["snapshot_hash"] == verified["snapshot_hash"]:
+                return recovery_ai.render(cached, verified)
+    # No database lock spans the provider request. Meta sees only redacted,
+    # verified scheduling facts and cannot mutate proposals or reservations.
+    try:
+        generated = recovery_ai.explain(verified)
+    except integrations.IntegrationError as exc:
+        fail(str(exc), 503)
+    with transaction() as c:
+        p = get(c, proposal_id, "proposal")
+        current = verified_recovery(c, p)
+        if current["snapshot_hash"] != verified["snapshot_hash"]:
+            fail(
+                "Scheduling inputs changed while Meta was explaining. Generate a fresh proposal or explanation."
+            )
+        record = dict(
+            id=uid(),
+            proposal_id=proposal_id,
+            snapshot_hash=current["snapshot_hash"],
+            created_at=stamp(),
+            **generated,
+        )
+        put(c, "recovery_explanation", record)
+        p["explanation_id"] = record["id"]
+        put(c, "proposal", p)
+        audit(
+            c,
+            p["job_id"],
+            "recovery_explained",
+            {
+                "proposal_id": proposal_id,
+                "model": record["model"],
+                "snapshot_hash": current["snapshot_hash"],
+            },
+        )
+        return recovery_ai.render(record, current)
+
+
+@app.get("/api/proposals/{proposal_id}/explanation")
+def get_recovery_explanation(proposal_id: str):
+    with engine.connect() as c:
+        p = get(c, proposal_id, "proposal")
+        try:
+            verified = verified_recovery(c, p)
+        except HTTPException as exc:
+            return {"status": "stale", "detail": exc.detail, "approval_required": True}
+        if not p.get("explanation_id"):
+            return {"status": "not_requested", "approval_required": True}
+        record = get(c, p["explanation_id"], "recovery_explanation")
+        if record["snapshot_hash"] != verified["snapshot_hash"]:
+            return {
+                "status": "stale",
+                "detail": "Verified capacity changed; refresh the recovery proposal/explanation.",
+                "approval_required": True,
+            }
+        return recovery_ai.render(record, verified)
+
+
+class SelectRecoveryOption(BaseModel):
+    option_id: str = Field(min_length=1, max_length=40)
+
+
+@app.post("/api/proposals/{proposal_id}/select-option")
+def select_recovery_option(proposal_id: str, body: SelectRecoveryOption):
+    with transaction() as c:
+        p = get(c, proposal_id, "proposal")
+        verified_recovery(c, p)
+        options = [p["choice"], *p["alternatives"]]
+        chosen = next((o for o in options if o["option_id"] == body.option_id), None)
+        if chosen is None:
+            fail("Select an option from the verified proposal.", 422)
+        if not chosen["on_time"]:
+            fail("Late options require manual deadline review.", 422)
+        p["choice"] = chosen
+        p["alternatives"] = sorted(
+            [o for o in options if o["option_id"] != body.option_id],
+            key=lambda o: o["option_id"],
+        )
+        # The selected slot changes only the uncommitted proposal. The model does
+        # not select for the operator and this endpoint cannot reserve capacity.
+        job = get(c, p["job_id"], "job")
+        p["message_draft"] = (
+            f"Your job {job['title']} is proposed for {chosen['printer_name']}, completing {chosen['end']}. Your requested deadline remains feasible."
+        )
+        put(c, "proposal", p)
+        audit(
+            c,
+            p["job_id"],
+            "recovery_option_selected",
+            {"proposal_id": proposal_id, "option_id": body.option_id},
+        )
+        return p
+
+
 @app.post("/api/proposals/{proposal_id}/approve")
 def approve(proposal_id: str, body: Approve):
     with transaction() as c:
@@ -951,6 +1087,13 @@ def approve(proposal_id: str, body: Approve):
         q = valid_quote(c, job)
         if q["id"] != p["quote_id"]:
             fail("Quote changed; generate a new proposal")
+        if p["kind"] == "recovery" and p.get("explanation_id"):
+            verified = verified_recovery(c, p)
+            explanation = get(c, p["explanation_id"], "recovery_explanation")
+            if explanation["snapshot_hash"] != verified["snapshot_hash"]:
+                fail(
+                    "Meta explanation is stale because capacity changed. Refresh the proposal/explanation before approval."
+                )
         expected = "recovery_required" if p["kind"] == "recovery" else "quote_ready"
         if job["status"] != expected:
             fail("Job state changed")

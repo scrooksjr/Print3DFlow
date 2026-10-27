@@ -10,9 +10,37 @@ Print3DFlow connects a customer request to a reviewed quote, a compatible printe
 2. **Geometry and quoting:** validate an STL, confirm units, preview the actual mesh, and obtain native Bambu Studio slice estimates or explicitly labeled manual estimates.
 3. **Shop pricing:** versioned rate cards support material cost, waste policy, machine-time allowance, setup, markup, minimum charges, and reviewed support surcharges.
 4. **Scheduling:** propose compatible capacity and commit reservations atomically after approval.
-5. **Exception recovery:** inject a simulated pre-start outage, review a replacement plan, and atomically replace the old reservation while preserving the quote.
+5. **Exception recovery:** inject a simulated pre-start outage, ask Meta to compare verified scheduling options, choose a proposal, and approve atomic replacement while preserving the quote.
 
-Meta handles intake. Quote arithmetic, scheduling constraints, recovery search, and the customer-update template are deterministic application logic. No messages or printer commands are sent.
+Meta handles intake and selects evidence-backed recovery reasons and a recommended option. The server validates every selected reason and renders text from verified facts; freeform model facts are not displayed. Quote arithmetic, scheduling constraints, recovery search, and the customer-update template remain deterministic application logic. No messages or printer commands are sent.
+
+## Meta's runtime role — judge verification
+
+Meta is part of the running product in **two operator-triggered workflows**, using `muse-spark-1.3` by default through the Meta Model API. These are real backend inference requests, not static demo responses.
+
+| Runtime feature | Meta contributes | Application verifies and controls |
+| --- | --- | --- |
+| Job intake | Extracts structured requirements from customer text and identifies missing information. | Validates the response schema; the operator resolves missing fields and reviews before creating a job. |
+| Outage recovery adviser | Recommends among supplied feasible options and selects relevant tradeoff reasons. | Computes compatible slots, validates every selected reason against scheduling facts, and renders factual explanations. Only explicit operator approval changes reservations. |
+
+### Verify in the running app
+
+1. Follow the setup below with your own Meta credentials. A configured-key indicator alone does **not** establish a successful inference call.
+2. Open **New print job**, enter a synthetic PLA request with a future deadline but omit units, and click **Extract draft with Meta**. Inspect the returned draft and clarification, resolve units, and review before creating the job. Clarification wording may vary.
+3. Upload `samples/demo-block.stl`, obtain a quote with a supported locally installed slicer/profile (or an explicitly labeled manual estimate), then approve a compatible reservation. Keep the deadline comfortably beyond the simulated outage and perform recovery before the reservation starts.
+4. Click **Simulate printer outage**, **Propose recovery**, then **Explain recovery options with Meta**. Inspect the model attribution, recommendation, and actual verified reasons. With one compatible printer, expect a later slot on that printer rather than invented alternatives.
+5. Pause on **APPROVAL REQUIRED** and **Selected proposal · awaiting approval**: the original reservation remains recorded. Selecting another option changes only the pending proposal. Click **Approve recovery** separately, then inspect the replacement and audit history.
+
+### Inspect the integration
+
+- Intake: [`backend/integrations.py`](backend/integrations.py), `extract_intake`; API: `POST /api/intake/drafts`.
+- Recovery: [`backend/recovery.py`](backend/recovery.py); APIs: `POST /api/proposals/{proposal_id}/explanation` and `GET` on the same path. Responses identify `source: meta_model_api`, the model, and a versioned scheduling snapshot.
+- Approval boundary: [`backend/main.py`](backend/main.py), `select_recovery_option` and `approve`. Capacity changes invalidate explanations; approval rechecks current state.
+- Automated safeguards: [`test_integrations.py`](backend/tests/test_integrations.py) and [`test_recovery_explanations.py`](backend/tests/test_recovery_explanations.py). Provider mocks test validation and failure handling; they are not proof of a live call. Verify real inference through the app using your own key.
+
+Both integrations call `https://api.meta.ai/v1/chat/completions`. Provider failures are reported rather than replaced with fabricated AI output. Successful recovery explanations may be reused for the same unchanged snapshot; use a fresh proposal/run to observe a new request. Manual fallback is labeled and does not demonstrate Meta inference.
+
+See the [three-minute demo sequence](docs/DEMO.md), [integration details](docs/SETUP.md), and [submission description](docs/SUBMISSION.md). The recorded X2D demonstration uses locally imported operator settings; private profiles and credentials are not included in this repository.
 
 ## Quick start
 
@@ -45,7 +73,7 @@ SHOP_TIMEZONE=America/New_York
 
 Use a Meta Model API key with access and credits for the configured Standard-mode model. Restart after editing. Do not put keys in the frontend, screenshots, issues, commits, or public reports. `.env.example` contains placeholders only.
 
-Only the request text and date/time context are sent to the official Meta endpoint when the operator requests extraction. Uploaded meshes remain local. The returned schema is validated before the draft can be reviewed; provider failures do not silently become fabricated AI results.
+For intake, only the request text and date/time context are sent when the operator requests extraction. For recovery, Meta receives verified option facts and allowed reason codes; customer text, printer names, meshes, price amounts, and private rate cards are excluded from that request. Uploaded meshes remain local. Responses are validated before use; provider failures do not silently become fabricated AI results.
 
 ## Printer configuration
 
