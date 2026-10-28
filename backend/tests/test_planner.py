@@ -113,3 +113,18 @@ def test_changes_during_inference_discard_plan(client, monkeypatch):
             j=m.get(conn,jid,'job');j['version']+=1;m.put(conn,'job',j)
     meta(monkeypatch,mutate=change)
     assert client.post('/api/jobs/'+jid+'/planner',json={'consent_to_send_planning_facts':True}).status_code==409
+
+
+def test_new_instruction_to_refresh_stale_comparison_is_not_itself_stale(setup, monkeypatch):
+    c,m,_ = setup
+    jid,_ = create(setup)
+    with m.transaction() as conn:
+        j=m.get(conn,jid,'job');j['version']+=1;m.put(conn,'job',j)
+    meta(monkeypatch)
+    r=c.post('/api/jobs/'+jid+'/planner',json={'consent_to_send_planning_facts':True})
+    assert r.status_code==201,r.text
+    p=r.json()
+    assert not p['stale']
+    assert p['comparison_id'] is None
+    assert p['recommendation']['next_action']=='request_comparison'
+    assert c.get('/api/jobs/'+jid+'/planner').json()['recommendation'] is not None

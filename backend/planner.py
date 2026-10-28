@@ -221,7 +221,7 @@ def register(app):
                 comparison.verify(m, c, m.get(c, batch_id, "comparison"))
             result = dict(id=m.uid(), job_id=job_id, status="ready", created_at=m.stamp(),
                           expires_at=(m.now() + timedelta(minutes=5)).isoformat(), snapshot_hash=before,
-                          model=model, source="meta_model_api_tool_calls", trail=trace, comparison_id=batch_id,
+                          model=model, source="meta_model_api_tool_calls", trail=trace, comparison_id=batch_id if options["status"] == "verified" else None,
                           recommendation=dict(**decision.model_dump(), next_step=LABELS.get(decision.next_action, "Resolve the listed requirement blockers before continuing."),
                                               reasons=[LABELS[e.split(":")[-1]] for e in decision.evidence_ids]))
             m.put(c, "planner", result)

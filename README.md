@@ -139,9 +139,21 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified production planner and approval workflow
+
+The latest isolated planner run passed **74 browser and API checks**, with **four live Meta planner runs** and native Bambu slices for **A1, A1 mini and X2D**. It used the owned sample block and synthetic demo pricing. These checks include overlapping assertions across the workflow, not 74 independent scenarios:
+
+- Meta requested both allowed read tools; the browser displayed the verified trail, a supported option recommendation and the separate approval requirement. Missing comparisons were reported rather than invented.
+- Planning and browser-only option selection preserved the selected baseline quote and reservations. Tool results excluded customer and financial fields.
+- Changing a requirement marked the previous plan stale, hid its recommendation, retained a historical trail and prevented stale comparison approval. Replanning requested a fresh comparison; after new native results, it recommended review of a verified option.
+- A new instruction to refresh stale comparison evidence remains usable: only advice based on a verified comparison retains its comparison reference. A regression test covers this stale-refresh correction.
+- Unconfirmed approval, incorrect totals and incorrect currencies were rejected without changing commitments. Only a scripted operator approval matching the exact option, total and currency selected its quote and created one synthetic reservation. Repeating that approval was idempotent, and the resulting state change invalidated prior planner advice.
+
+The separate regression suite passed **156 tests**, with two optional tests skipped. No physical printer was contacted; main-workspace jobs and private rates were untouched. The synthetic reservation was created only in the isolated test database. Models, costs, credentials, imported settings, screenshots, test scripts and raw reports remain private; only this summary is published.
+
 ### Verified finish selection and additional-cost safeguards
 
-The latest isolated finish workflow passed **43 checks: 34 API assertions and 9 browser observations**, using the owned sample block, synthetic demo pricing and **four live Meta intake calls** (one per finish option). The checks covered overlapping behavior across As-printed, Sanding, Painting and Other / discuss with shop:
+An earlier isolated finish workflow passed **43 checks: 34 API assertions and 9 browser observations**, using the owned sample block, synthetic demo pricing and **four live Meta intake calls** (one per finish option). The checks covered overlapping behavior across As-printed, Sanding, Painting and Other / discuss with shop:
 
 - Each selected finish was retained by Meta without another generic finish clarification and persisted on reviewed job submission.
 - As-printed produced a synthetic print-only quote. No reservation was committed.
