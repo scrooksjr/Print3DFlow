@@ -139,6 +139,17 @@ This writes only local ignored profile data and a local registry. The original p
 
 ## Verification
 
+### Verified finish selection and additional-cost safeguards
+
+The latest isolated finish workflow passed **43 checks: 34 API assertions and 9 browser observations**, using the owned sample block, synthetic demo pricing and **four live Meta intake calls** (one per finish option). The checks covered overlapping behavior across As-printed, Sanding, Painting and Other / discuss with shop:
+
+- Each selected finish was retained by Meta without another generic finish clarification and persisted on reviewed job submission.
+- As-printed produced a synthetic print-only quote. No reservation was committed.
+- Sanding, Painting and Other entered `awaiting_finish_review`. Each displayed the additional-cost notice and the requirement for shop review and a separately approved finishing price; quote and scheduling controls were hidden.
+- Manual quotes, native slice quotes and cross-printer comparisons each rejected every custom-finishing job with **HTTP 422**. Scheduling proposals returned **HTTP 409**. No custom-finishing quotes or reservations were created.
+
+This run verified request capture, live intake and safeguards, not custom-finishing pricing or fulfillment. A finishing-charge approval workflow is not implemented yet; no surcharge was invented. No physical printer was contacted, private shop rates were not loaded, and main-workspace jobs were unchanged. Only this summary is public; credentials, material costs, imported settings, model files, screenshots and raw reports remain excluded.
+
 ### Verified four-color keychain workflow
 
 A subsequent isolated run passed **13 browser and API checks** using an original four-color keychain 3MF rather than a synthetic block. It verified:
