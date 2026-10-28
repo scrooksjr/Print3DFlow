@@ -1344,6 +1344,10 @@ from backend.comparison import register as register_comparison
 
 register_comparison(app)
 
+from backend.planner import register as register_planner
+
+register_planner(app)
+
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
     app.mount("/", StaticFiles(directory=DIST, html=True), name="frontend")
