@@ -35,3 +35,9 @@ def client(tmp_path, monkeypatch):
     with TestClient(main.app) as c:
         yield c
     main.engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def isolate_meta_provider(monkeypatch):
+    # Local operator provider selection must not affect offline regression tests.
+    monkeypatch.setenv("META_PROVIDER", "meta")

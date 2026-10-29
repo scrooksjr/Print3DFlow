@@ -3,6 +3,8 @@
 Neither adapter has a printer connection or permission to commit a production plan.
 """
 
+from backend import meta_provider
+
 import hashlib
 import json
 import math
@@ -40,7 +42,7 @@ class IntakeDraft(BaseModel):
 
 
 def meta_configured():
-    return bool(os.getenv("META_API_KEY", "").strip())
+    return bool(meta_provider.config()[1])
 
 
 def extract_intake(
@@ -50,12 +52,11 @@ def extract_intake(
     requested_material=None,
     requested_finish=None,
 ):
-    key = os.getenv("META_API_KEY", "").strip()
+    provider, key, model, endpoint = meta_provider.config()
     if not key:
         raise IntegrationError(
             "Meta is not configured. Set META_API_KEY in the local .env file and restart the server."
         )
-    model = os.getenv("META_MODEL", "muse-spark-1.3")
     if "contributor" in model:
         raise IntegrationError(
             "Use a Standard-mode model ID for this intake integration."
@@ -122,7 +123,7 @@ def extract_intake(
         # Fixed official endpoint; API keys never go to a configurable destination.
         with httpx.Client(timeout=httpx.Timeout(40, connect=10)) as client:
             response = client.post(
-                "https://api.meta.ai/v1/chat/completions",
+                endpoint,
                 headers={"Authorization": f"Bearer {key}"},
                 json=payload,
             )

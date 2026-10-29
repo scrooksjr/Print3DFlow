@@ -299,7 +299,8 @@ def integration_status():
     return {
         "meta": {
             "configured": integrations.meta_configured(),
-            "model": os.getenv("META_MODEL", "muse-spark-1.3"),
+            "model": integrations.meta_provider.config()[2],
+            "provider": integrations.meta_provider.config()[0],
             "live_verified": False,
         },
         "slicer": {
@@ -636,7 +637,8 @@ def comparison_project(quote_id: str):
 def build_quote(c, job, body: Estimates, provenance=None):
     from backend.color_inspection import require_single_filament
 
-    require_single_filament(job)
+    if not (provenance or {}).get("verified_multicolor"):
+        require_single_filament(job)
     if job["material"] != "PLA":
         fail(
             "Configure verified matching filament profiles and material rates before quoting this request",
@@ -658,6 +660,8 @@ def build_quote(c, job, body: Estimates, provenance=None):
     hours = Decimal(str(body.hours_per_part)) * qty
     card = current_rates(c)
     rates = RateCard.model_validate(card["rates"])
+    if (provenance or {}).get("verified_multicolor"):
+        rates = rates.model_copy(update={"waste_percent": Decimal(0)})
     try:
         price = calculate(
             grams, hours, rates, body.support_percent, body.apply_support_surcharge
@@ -733,10 +737,14 @@ def quote(job_id: str, body: Estimates):
 def valid_quote(c, job):
     from backend.color_inspection import require_single_filament
 
-    require_single_filament(job)
     if not job.get("latest_quote_id"):
         fail("Create a quote first")
     q = get(c, job["latest_quote_id"], "quote")
+    if q.get("source") == "bambu_multicolor":
+        from backend.multicolor import validate_quote
+        validate_quote(__import__(__name__, fromlist=['']), c, job, q)
+    else:
+        require_single_filament(job)
     if q.get("support_review_required"):
         fail(
             "Review the support percentage and optional surcharge, then generate a new quote before reserving."
@@ -1347,6 +1355,10 @@ register_comparison(app)
 from backend.planner import register as register_planner
 
 register_planner(app)
+
+from backend.multicolor import register as register_multicolor
+
+register_multicolor(app)
 
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():

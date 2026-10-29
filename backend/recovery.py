@@ -2,6 +2,8 @@
 not invent slots, prices, prose facts, or reservation commands.
 """
 
+from backend import meta_provider
+
 import hashlib
 import json
 import os
@@ -191,8 +193,7 @@ def snapshot(proposal, job, quote, old, printers, reservations, outages, now):
 
 
 def explain(verified):
-    key = os.getenv("META_API_KEY", "").strip()
-    model = os.getenv("META_MODEL", "muse-spark-1.3")
+    provider, key, model, endpoint = meta_provider.config()
     if not key:
         raise IntegrationError(
             "Meta is not configured. Verified scheduling options remain available for manual review."
@@ -228,7 +229,7 @@ def explain(verified):
     try:
         with httpx.Client(timeout=httpx.Timeout(40, connect=10)) as client:
             response = client.post(
-                "https://api.meta.ai/v1/chat/completions",
+                endpoint,
                 headers={"Authorization": "Bearer " + key},
                 json=payload,
             )

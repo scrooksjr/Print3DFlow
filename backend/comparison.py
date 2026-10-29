@@ -1,5 +1,7 @@
 """Independent slices and quotes; no commitment until explicit comparison approval."""
 
+from backend import meta_provider
+
 import copy
 import hashlib
 import json
@@ -215,8 +217,7 @@ def worker(m, batch_id):
 
 
 def ask_meta(batch):
-    key = os.getenv("META_API_KEY", "").strip()
-    model = os.getenv("META_MODEL", "muse-spark-1.3")
+    provider, key, model, endpoint = meta_provider.config()
     if not key or "contributor" in model:
         raise integrations.IntegrationError(
             "Configure a Standard-mode Meta model to request advice."
@@ -249,7 +250,7 @@ def ask_meta(batch):
     try:
         with httpx.Client(timeout=httpx.Timeout(40, connect=10)) as client:
             response = client.post(
-                "https://api.meta.ai/v1/chat/completions",
+                endpoint,
                 headers={"Authorization": "Bearer " + key},
                 json=dict(
                     model=model,

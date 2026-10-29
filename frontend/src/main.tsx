@@ -13,6 +13,7 @@ import {RecoveryExplanation} from './RecoveryExplanation';
 import {PrinterComparison} from './PrinterComparison';
 import {ModelColors} from './ModelColors';
 import {ProductionPlanner} from './ProductionPlanner';
+import {MulticolorQuote} from './MulticolorQuote';
 
 type RecordData = Record<string, any>;
 const empty = {jobs:[],printers:[],quotes:[],proposals:[],reservations:[],outages:[],audit:[],tasks:[]} as Record<string,RecordData[]>;
@@ -75,6 +76,7 @@ function App(){
  {job.file?<><Mesh job={job}/>{job.file.source_format==='3mf'&&<p className="form-note">{job.file.import_note}</p>}<div className="mesh-info"><span><Check size={14}/> {job.file.filename}</span><span>{job.file.triangles} triangles · {job.units||'units unconfirmed'}</span></div></>:<label className={'upload '+(busy?'disabled':'')}><Upload size={24}/><b>Drop in your next print</b><span>Choose a watertight STL · up to 64 MiB</span><input type="file" accept=".stl,.3mf" disabled={busy} onChange={e=>upload(e.target.files?.[0])}/></label>}
  {job.material!=='PLA'&&<div className="clarification"><b>{job.material} profile setup required</b><p>Request recorded. Before quoting, configure a saved {job.material} Bambu project for each compatible printer, its material cost, and a verified sample slice. Existing PLA settings and rates will not be used.</p></div>}
  {job.file&&<ModelColors file={job.file}/>}
+ <MulticolorQuote key={'multicolor-'+job.id} job={job} busy={busy} run={run} request={api}/>
  <ProductionPlanner key={'planner-'+job.id} job={job} configured={integrations.meta.configured} busy={busy} run={run} request={api}/>
  {job.finish&&job.finish!=='as-printed'?<div className="clarification"><b>Custom finishing - additional cost</b><p>Your {job.finish} request is recorded. Shop review and a separately approved finishing price are required before quoting or scheduling.</p></div>:<>
  <QuotingPanel key={job.id} job={job} quote={quote} tasks={data.tasks} slicer={integrations.slicer} busy={busy} run={run} request={api}/>

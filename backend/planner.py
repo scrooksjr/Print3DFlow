@@ -1,5 +1,7 @@
 """Bounded Meta tool loop. Read-only evidence; no production mutation tools."""
 
+from backend import meta_provider
+
 import hashlib
 import json
 import os
@@ -18,6 +20,7 @@ LABELS = {
     "units_required": "Confirm model units.",
     "material_setup": "Configure matching material profiles and rates.",
     "finish_review": "Custom finishing needs shop review and separate pricing.",
+    "multicolor_native_only": "A verified X2D multicolor price is selected. Use Find a printer slot below and separately approve the reservation; cross-printer multicolor comparison is not enabled.",
     "mapping_review": "Multicolor or unresolved mappings require verification before quoting.",
     "legacy_mapping": "Re-upload the original 3MF for assignment inspection.",
     "already_reserved": "An existing reservation requires the dedicated recovery workflow.",
@@ -71,7 +74,16 @@ def evidence(m, c, job):
     if file.get("source_format") == "3mf" and file.get("color_info") is None:
         blockers.append("legacy_mapping")
     elif (file.get("color_info") or {}).get("quoting_blocked"):
-        blockers.append("mapping_review")
+        q = m.get(c, job["latest_quote_id"], "quote") if job.get("latest_quote_id") else {}
+        if q.get("source") == "bambu_multicolor":
+            try:
+                from backend.multicolor import validate_quote
+                validate_quote(m,c,job,q)
+                blockers.append("multicolor_native_only")
+            except HTTPException:
+                blockers.append("mapping_review")
+        else:
+            blockers.append("mapping_review")
     if job.get("reservation_id") and job["status"] != "recovery_required":
         blockers.append("already_reserved")
     readiness = dict(status="blocked" if blockers else "ready", evidence_ids=blockers or ["ready"])
@@ -123,10 +135,9 @@ def validate_decision(raw, readiness, options):
 
 
 def run_meta(readiness, options):
-    key = os.getenv("META_API_KEY", "").strip()
+    provider, key, model, endpoint = meta_provider.config()
     if not key:
         raise integrations.IntegrationError("Configure Meta before running the planner.")
-    model = os.getenv("META_MODEL", "muse-spark-1.3")
     tools = []
     for name, description in [("check_job_readiness", "Read verified requirement blockers."), ("read_verified_comparison", "Read existing independently sliced and checked schedule options. Missing results require an operator comparison; no slicing or changes are performed.")]:
         tools.append(dict(type="function", function=dict(name=name, description=description, parameters=dict(type="object", properties={}, additionalProperties=False))))
@@ -148,7 +159,7 @@ def run_meta(readiness, options):
         with httpx.Client(timeout=httpx.Timeout(30, connect=10)) as client:
             for _ in range(4):
                 delivered = seen.copy()
-                response = client.post("https://api.meta.ai/v1/chat/completions", headers={"Authorization": f"Bearer {key}"}, json=dict(model=model, messages=messages, tools=tools, tool_choice="auto", max_completion_tokens=2048, reasoning_effort="low"))
+                response = client.post(endpoint, headers={"Authorization": f"Bearer {key}"}, json=dict(model=model, messages=messages, tools=tools, tool_choice=({"type": "function", "function": {"name": "submit_plan"}} if seen == {"check_job_readiness", "read_verified_comparison"} else "auto"), max_completion_tokens=4096, reasoning_effort="low"))
                 if response.status_code >= 400:
                     raise integrations.IntegrationError(f"Meta planner request failed (HTTP {response.status_code}); no commitments changed.")
                 choice = response.json()["choices"][0]
