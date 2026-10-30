@@ -1360,6 +1360,14 @@ from backend.multicolor import register as register_multicolor
 
 register_multicolor(app)
 
+from backend.execution import register as register_execution
+
+register_execution(app)
+
+from backend.printer_connector import register as register_connector
+
+register_connector(app)
+
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
     app.mount("/", StaticFiles(directory=DIST, html=True), name="frontend")

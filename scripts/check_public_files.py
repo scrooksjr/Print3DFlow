@@ -23,7 +23,7 @@ def main():
         if (
             value
             and len(value) >= 8
-            and re.search(r"KEY|TOKEN|SECRET|PASSWORD", key, re.I)
+            and re.search(r"KEY|TOKEN|SECRET|PASSWORD|ACCESS_CODE|READONLY_SERIAL", key, re.I)
         ):
             secrets.append(value.encode())
     blocked_prefixes = (

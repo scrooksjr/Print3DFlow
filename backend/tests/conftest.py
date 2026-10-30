@@ -41,3 +41,8 @@ def client(tmp_path, monkeypatch):
 def isolate_meta_provider(monkeypatch):
     # Local operator provider selection must not affect offline regression tests.
     monkeypatch.setenv("META_PROVIDER", "meta")
+
+
+@pytest.fixture(autouse=True)
+def isolate_printer_connector(monkeypatch):
+    monkeypatch.delenv("BAMBU_READONLY_PRINTER_ID", raising=False)
