@@ -4,6 +4,7 @@ import json
 from datetime import timedelta
 from typing import Literal
 
+from backend import bed_check
 from backend import printer_connector
 from fastapi import HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -68,7 +69,10 @@ def register(app):
                 blockers.append("Printer telemetry does not report an idle or finished state.")
             if telemetry.get("error_present") or not telemetry.get("error_known"):
                 blockers.append("Printer error state is present or unknown; inspect locally.")
-        basis = dict(connection=connection, job=job, quote=quote, reservation=reservation, printer=printer, policy=selected, outages=outages)
+        visual_bed=bed_check.summary(m,c,printer["id"]) if printer else dict(status="not_checked",advisory_only=True)
+        if visual_bed.get("id") and not visual_bed.get("stale") and not visual_bed.get("operator_confirmation_current"):
+            blockers.append("Review the current visual bed assessment and record a physical empty-bed inspection; Meta cannot approve readiness.")
+        basis = dict(visual_bed=visual_bed,connection=connection, job=job, quote=quote, reservation=reservation, printer=printer, policy=selected, outages=outages)
         fingerprint = hashlib.sha256(json.dumps(basis, sort_keys=True).encode()).hexdigest()
         reviews = [r for r in m.rows(c, "execution_review") if r["job_id"] == job_id]
         reviews.sort(key=lambda r: r["created_at"])
@@ -76,7 +80,7 @@ def register(app):
         current = bool(last and last["snapshot"] == fingerprint and m.parse(last["expires_at"]) > m.now() and not blockers)
         return dict(snapshot=fingerprint, printer_id=printer["id"] if printer else None, printer_name=printer["name"] if printer else None, policy=selected,
                     blockers=blockers, review_current=current, last_review=last,
-                    connection=connection,
+                    connection=connection,visual_bed=visual_bed,
                     remote_start_allowed=False, automatic_execution_allowed=False,
                     next_step="Start manually at the printer after your own final checks." if current else "Resolve blockers and confirm physical readiness.")
 

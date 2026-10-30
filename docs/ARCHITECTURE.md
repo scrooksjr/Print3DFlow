@@ -88,6 +88,7 @@ Arrows show application data flow, not authorization to perform every operation.
 | Provider configuration | Fixed provider endpoints, separate credentials and hackathon model selection | [backend/meta_provider.py](../backend/meta_provider.py) |
 | Execution readiness | Per-printer policy, physical check attestations and readiness blockers | [backend/execution.py](../backend/execution.py) |
 | Printer connector | TLS certificate/serial identity verification and subscribe-only LAN status samples | [backend/printer_connector.py](../backend/printer_connector.py) |
+| Visual bed review | Ephemeral evidence, image-specific consent, validated Meta classification and separate physical confirmation | [backend/bed_check.py](../backend/bed_check.py) |
 | Camera and light controls | Local memory-only camera sessions and separately confirmed chamber-light requests | [backend/printer_view.py](../backend/printer_view.py) |
 
 ## Job and approval flow
@@ -135,6 +136,12 @@ See [setup](SETUP.md), the [demo](DEMO.md), [submission description](SUBMISSION.
 
 ## Camera and light boundary
 
-Camera viewing uses a certificate-verified RTSPS connection to the printer and a temporary loopback-only relay for in-process decoding. Browser responses contain JPEG frames, never printer credentials or remote stream URLs. Sessions expire after two minutes, with explicit stop controls and in-memory frames only. Camera Off stops application viewing; it does not disable the printer camera or recording system. Camera images are not sent to Meta and do not automatically satisfy bed-clearance checks.
+Camera viewing uses a certificate-verified RTSPS connection to the printer and a temporary loopback-only relay for in-process decoding. Browser responses contain JPEG frames, never printer credentials or remote stream URLs. Sessions expire after two minutes, with explicit stop controls and in-memory frames only. Camera Off stops application viewing; it does not disable the printer camera or recording system. Camera images are sent to Meta only through a separate explicit bed-check consent action and never automatically satisfy bed-clearance checks.
 
 Chamber-light control is a separate physical command surface, unavailable to Meta tools. It requires explicit confirmation, fresh reported light state, a whitelisted on/off value, TLS-authenticated MQTT, and an observed post-command state before reporting confirmation. Unconfirmed actions are not retried automatically. No print, heater, motion, upload or arbitrary command endpoint is introduced.
+
+## Visual bed-review boundary
+
+A fresh frame from the active authenticated camera session is captured locally before any model request. The image-specific consent action sends that single JPEG and a fixed prompt through the shared provider adapter. The result must match a bounded classification and reason-code schema; contradictory empty-bed claims and stale inference responses are rejected. Exact capture evidence is visible for sixty seconds in memory only, with no image bytes persisted in the database or audit.
+
+Appears-empty is advisory and never approves execution. A separate operator action records physical inspection; a current visual result without that review blocks execution readiness. Old results are labelled stale and cannot be confirmed. Current bed appearance is not a forecast of future availability: deterministic scheduling and existing approval routes are unchanged. Meta has no bed-clearing, light, reservation or printer-command tools. Synthetic vision integration checks do not establish physical detection accuracy.

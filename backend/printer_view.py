@@ -217,7 +217,7 @@ def register(app):
         with _SESSION_LOCK:
             previous=_SESSIONS.get(printer_id)
             if previous and previous["thread"].is_alive():m.fail("A camera session is active or stopping; stop it before starting another.")
-            s=dict(id=uuid.uuid4().hex,stop=threading.Event(),ready=threading.Event(),deadline=time.monotonic()+120,status="connecting",frame=None,updated=0)
+            s=dict(settings_hash=pc.settings_hash(settings),id=uuid.uuid4().hex,stop=threading.Event(),ready=threading.Event(),deadline=time.monotonic()+120,status="connecting",frame=None,updated=0)
             s["thread"]=threading.Thread(target=camera_worker,args=(s,settings),daemon=True)
             _SESSIONS[printer_id]=s
             s["thread"].start()
