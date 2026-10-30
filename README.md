@@ -4,6 +4,8 @@ Manufacturing workflow assistant for **Print3DStore**, built for the Meta Global
 
 Print3DFlow connects a customer request to a reviewed quote, a compatible printer reservation, and recovery when a printer becomes unavailable.
 
+See the [current architecture and system diagram](docs/ARCHITECTURE.md) for components, data flows, Meta integration, printer connectivity, and approval boundaries.
+
 ## Workflow
 
 1. **Meta-assisted intake:** Muse Spark extracts a structured draft and asks about missing requirements. The operator reviews before creating a job.
