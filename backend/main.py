@@ -1368,6 +1368,10 @@ from backend.printer_connector import register as register_connector
 
 register_connector(app)
 
+from backend.printer_view import register as register_printer_view
+
+register_printer_view(app)
+
 DIST = ROOT / "frontend" / "dist"
 if DIST.exists():
     app.mount("/", StaticFiles(directory=DIST, html=True), name="frontend")

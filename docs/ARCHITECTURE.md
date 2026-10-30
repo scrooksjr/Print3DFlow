@@ -35,7 +35,8 @@ flowchart TD
         MetaAPI["Original Meta Model API<br/>Configured Muse Spark model"]
     end
 
-    Printer["Physical Bambu printer<br/>Local MQTT status reports"]
+    View["Camera viewer / explicit light controls<br/>Verified TLS relay, memory-only frames<br/>Fixed chamber-light On / Off endpoint"]
+    Printer["Physical Bambu printer<br/>MQTT reports and RTSPS liveview"]
 
     Operator --> UI
     UI --> API
@@ -64,6 +65,9 @@ flowchart TD
     API -->|"Explicit connection check"| Connector
     Printer -->|"TLS + authenticated report subscription"| Connector
     Connector -->|"Whitelisted status sample"| DB
+    UI --> View
+    Printer -->|"Certificate-verified camera stream"| View
+    View -->|"Explicit confirmed chamber-light request only"| Printer
     Execution -->|"Readiness and blockers"| UI
 ```
 
@@ -84,6 +88,7 @@ Arrows show application data flow, not authorization to perform every operation.
 | Provider configuration | Fixed provider endpoints, separate credentials and hackathon model selection | [backend/meta_provider.py](../backend/meta_provider.py) |
 | Execution readiness | Per-printer policy, physical check attestations and readiness blockers | [backend/execution.py](../backend/execution.py) |
 | Printer connector | TLS certificate/serial identity verification and subscribe-only LAN status samples | [backend/printer_connector.py](../backend/printer_connector.py) |
+| Camera and light controls | Local memory-only camera sessions and separately confirmed chamber-light requests | [backend/printer_view.py](../backend/printer_view.py) |
 
 ## Job and approval flow
 
@@ -107,7 +112,7 @@ Data-sharing permissions differ by workflow. Intake sends request text and valid
 
 Manual is the default execution policy. Assisted mode adds readiness review; starting the physical print still happens at the printer. The server rejects automatic execution policy requests, and no remote-start endpoint exists.
 
-The optional connector supports one explicitly configured printer at a time. It connects to a private LAN IPv4 address on MQTT TLS port 8883, validates the certificate chain and saved serial identity, authenticates using local credentials, and subscribes to that serial's report topic. There is no publish, upload, start, pause or stop path. Certificate failures have no insecure fallback.
+The optional connector supports one explicitly configured printer at a time. It connects to a private LAN IPv4 address on MQTT TLS port 8883, validates the certificate chain and saved serial identity, authenticates using local credentials, and subscribes to that serial's report topic. The status adapter has no publish, upload, start, pause or stop path. A separate operator-only light endpoint publishes only a fixed chamber-light On/Off request after confirmation. Certificate failures have no insecure fallback.
 
 A connection check waits for a non-retained status report with a recognized execution state. It stores only whitelisted state, progress, temperature and error-presence fields. Samples expire after 60 seconds; changed configuration invalidates them. This is an on-demand sample, not continuous monitoring. Fresh busy/error/unknown-error status blocks readiness. Assisted mode with a configured connector requires fresh telemetry. Bed clearance, physical filament mappings and sufficient material still require operator inspection. `FINISH` does not prove the plate is empty.
 
@@ -123,7 +128,13 @@ The prototype is intended for a trusted local operator environment and is not a 
 
 - Single-printer and small-fleet planning with configured compatible profiles; A1, A1 mini and X2D single-color workflows.
 - Dedicated component-assigned X2D four-PLA-color quoting with reviewed AMS 2 Pro mappings and native evidence. This is not general multicolor cross-printer support.
-- Optional read-only connection for one configured Bambu printer; no physical execution automation.
+- Optional read-only status and camera access for one configured Bambu printer, plus explicit chamber-light On/Off controls; no print execution automation.
 - A2L setup, additional verified material combinations, continuous fleet telemetry, batch packing and remote execution remain future work.
 
 See [setup](SETUP.md), the [demo](DEMO.md), [submission description](SUBMISSION.md), and [README](../README.md) for workflow details.
+
+## Camera and light boundary
+
+Camera viewing uses a certificate-verified RTSPS connection to the printer and a temporary loopback-only relay for in-process decoding. Browser responses contain JPEG frames, never printer credentials or remote stream URLs. Sessions expire after two minutes, with explicit stop controls and in-memory frames only. Camera Off stops application viewing; it does not disable the printer camera or recording system. Camera images are not sent to Meta and do not automatically satisfy bed-clearance checks.
+
+Chamber-light control is a separate physical command surface, unavailable to Meta tools. It requires explicit confirmation, fresh reported light state, a whitelisted on/off value, TLS-authenticated MQTT, and an observed post-command state before reporting confirmation. Unconfirmed actions are not retried automatically. No print, heater, motion, upload or arbitrary command endpoint is introduced.

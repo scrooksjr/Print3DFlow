@@ -74,7 +74,7 @@ def register(app):
         reviews.sort(key=lambda r: r["created_at"])
         last = reviews[-1] if reviews else None
         current = bool(last and last["snapshot"] == fingerprint and m.parse(last["expires_at"]) > m.now() and not blockers)
-        return dict(snapshot=fingerprint, printer_id=printer["id"] if printer else None, policy=selected,
+        return dict(snapshot=fingerprint, printer_id=printer["id"] if printer else None, printer_name=printer["name"] if printer else None, policy=selected,
                     blockers=blockers, review_current=current, last_review=last,
                     connection=connection,
                     remote_start_allowed=False, automatic_execution_allowed=False,

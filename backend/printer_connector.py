@@ -63,6 +63,11 @@ def parse_report(payload):
         v = report.get(source)
         if type(v) in (int, float) and math.isfinite(v) and 0 <= v <= maximum:
             result[name] = v
+    lights = report.get("lights_report", [])
+    if isinstance(lights, list):
+        for light in lights:
+            if isinstance(light, dict) and light.get("node") == "chamber_light" and light.get("mode") in ("on", "off"):
+                result["chamber_light"] = light["mode"]
     # Omit filenames, task IDs, serials, AMS payloads and unknown fields.
     return result
 
