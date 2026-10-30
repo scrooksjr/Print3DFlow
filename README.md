@@ -6,6 +6,8 @@ Print3DFlow connects a customer request to a reviewed quote, a compatible printe
 
 See the [current architecture and system diagram](docs/ARCHITECTURE.md) for components, data flows, Meta integration, printer connectivity, and approval boundaries.
 
+For hands-on use, start with the [user guide](docs/USER-GUIDE.md) and [28-case test checklist](docs/TEST-GUIDE.md). They cover offline prerequisites, optional live integrations, expected results, and approval/privacy checks.
+
 ## Workflow
 
 1. **Meta-assisted intake:** Muse Spark extracts a structured draft and asks about missing requirements. The operator reviews before creating a job.
