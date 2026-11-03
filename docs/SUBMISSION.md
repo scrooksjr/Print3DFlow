@@ -1,6 +1,18 @@
-# Print3DFlow â€” hackathon submission description
+# Print3DFlow - hackathon submission description
 
-## Copy-ready description
+## Final recorded keychain demo (2:55)
+
+Print3DFlow helps small 3D printing shops turn a customer request into a reviewed quote, a feasible printer reservation, and an outage recovery plan. Built for the Indie track, it combines Meta assistance with deterministic manufacturing evidence and explicit operator approval.
+
+In this 2:55 demonstration, Meta Muse Spark Open, served through Baseten using meta-models/muse-spark-open-1026, extracts requirements from a keychain request. The production planner makes real read-only tool calls and displays verified blocker and comparison results instead of inventing missing evidence.
+
+A separate native Bambu Studio workflow slices a reviewed four-color X2D project, showing filament-slot/tool assignments, purge and tower material, filament changes, and total native time. The operator separately approves the exact candidate price and the printer reservation. After a simulated pre-start outage, stale planner advice is marked historical. Meta explains verified recovery tradeoffs for a later compatible X2D slot; only a separate recovery approval commits the replacement while preserving the approved quote.
+
+The video is an edited walkthrough of actual app captures using an isolated workspace and invented demo pricing. It demonstrates successful inference and local slicing, not a physical print or hardware calibration. The four-color demo does not claim an A1/A1 mini cross-printer comparison, a refreshed successful multicolor planner comparison, or remote print execution. Credentials, private shop rates, imported profiles, model archives, and raw private reports are not distributed.
+
+The upload package names the submission video `Print3DFlow-Hackathon-Demo.mp4` (1920 x 1080, 24 fps, H.264/AAC, 175.042 seconds). Add its hosted, judge-accessible URL to the submission form after upload. Video files remain outside Git. The earlier workflow summaries below describe separate historical tests; the final video follows the X2D keychain sequence, not the former three-printer recording plan.
+
+## Extended feature and verification history
 
 Print3DFlow is a manufacturing workflow assistant for small 3D printing shops, built for the Indie track. It connects customer requests, slice-backed quotes, compatible printer scheduling, and recovery from printer outages in one reviewable workflow.
 
@@ -48,15 +60,22 @@ Repository: https://github.com/scrooksjr/Print3DFlow
 
 ## Stage One verification pointers
 
-- **Video 0:12-0:37:** attach the model, select As-printed, extract a real Meta intake draft, confirm STL units and review requirements.
-- **Video 0:37-1:00:** show independent A1, A1 mini and X2D slices, candidate quotes and checked schedules.
-- **Video 1:00-1:24:** run Plan with Meta; show actual model attribution, the recommendation and both verified tool results with evidence IDs.
-- **Video 1:24-1:40:** distinguish selecting the initial scenario option from separately approving its exact price and reservation.
-- **Video 1:40-2:24:** show stale advice after the initial commitment and simulated outage, the hidden recommendation and historical trail, the instruction to obtain fresh comparisons, and a new grounded plan after independent slices.
-- **Video 2:24-2:47:** show the original selected quote/reservation unchanged during alternative selection, then explicitly approve the exact price and replacement reservation.
-- **Video 2:47-3:00:** show planning/approval history and the approved replacement. These timestamps are recording targets; align them to the final video cut.
-- **Code:** `backend/integrations.py` performs intake inference; `backend/recovery.py` performs recovery inference and grounded-response validation. Both call the Meta Model API. `backend/main.py` implements the API and approval transaction boundary.
-- **Production planner:** see the README's 74-check summary. Inspect `backend/planner.py` for the bounded Meta tool loop, allowed read-only functions, evidence validation and stale-plan checks; `frontend/src/ProductionPlanner.tsx` displays the trail and consent. In the demo, create an independent comparison after reviewing profiles, then run Plan with Meta. After the simulated outage, show stale advice, request a fresh comparison and rerun the planner. Expand the returned tool facts and show that prices and reservations remain unchanged until separate approval. `backend/tests/test_planner.py` covers the planner safeguards.
+- **Video 0:00-0:14:** Print3DFlow. From keychain request to an approved production plan.
+- **Video 0:14-0:28:** Meta-assisted intake. Structured requirements, reviewed before job creation.
+- **Video 0:28-0:42:** Four assigned colors. Actual geometry, embedded dimensions and filament slots.
+- **Video 0:42-0:56:** Verified tool trail. Meta checks evidence instead of guessing.
+- **Video 0:56-1:10:** Native X2D slicing. Purge and change overhead are counted once.
+- **Video 1:10-1:24:** Review the candidate. Native tool allocation stays visible.
+- **Video 1:24-1:37:** Approve the exact price. Price approval does not reserve capacity.
+- **Video 1:37-1:48:** Approve the reservation. A separate scheduling decision.
+- **Video 1:48-2:01:** A simulated outage. The original reservation stays until replacement approval.
+- **Video 2:01-2:11:** Stale advice is visible. Historical evidence cannot silently become current.
+- **Video 2:11-2:27:** Meta explains recovery. A later X2D slot, the same approved quote.
+- **Video 2:27-2:41:** Operator-approved recovery. The audit records each commitment.
+- **Video 2:41-2:55:** Evidence, advice, approval. Print3DFlow · built for real shop decisions.
+- **Code:** `backend/integrations.py` performs intake inference; `backend/recovery.py` performs recovery inference and grounded-response validation. Their shared provider supports the Meta Model API or Baseten; the recorded demo uses Baseten-hosted Meta Muse Spark Open. `backend/main.py` implements the API and approval transaction boundary.
+- **Production planner:** `backend/planner.py` implements the bounded Meta tool loop, allowed read-only functions, evidence validation and stale-plan checks; `frontend/src/ProductionPlanner.tsx` displays the trail and consent. The final keychain demo shows verified blockers and missing comparison evidence, then marks that advice historical after state changes. It does not show a successful four-color cross-printer plan. `backend/tests/test_planner.py` covers safeguards; the 74-check summary refers to a separate single-filament workflow.
+- **Recorded provider and native evidence:** `backend/meta_provider.py` selects the fixed Baseten hackathon model; `backend/multicolor.py` implements the dedicated native X2D four-color verification and pricing path. Price and reservation approvals remain separate.
 - **Cross-printer adviser:** `backend/comparison.py` performs independent slicing, candidate pricing, schedule checks, validated Meta comparison and approval. `frontend/src/PrinterComparison.tsx` exposes separate data-sharing consent, option selection, and exact-price/reservation approval. `backend/tests/test_comparison.py` covers changed rates/capacity/profiles, provider failures, invalid model claims, support review, and explicit approval.
 - **Verify cross-printer behavior:** import your supported profiles, upload the owned sample, select profiles in Cross-printer quote adviser, review settings/support inputs and request independent slices. For a safe public demonstration, use synthetic pricing. Permit sending the displayed totals, request Meta advice, and show that the original quote/reservation remain unchanged. Select an option, then separately approve its exact price and reservation. During a simulated pre-start outage, verify the old reservation is released only at approval. Align video pointers to the final edit if this sequence replaces the single-printer recovery shot.
 - **A1/A1 mini verification:** the README summarizes the earlier matching-printer run and sample slicer estimates. Use `python -m scripts.import_a1_profile 'C:/path/to/your-reference.3mf'` with your own supported A1 or A1 mini PLA/0.4 mm project and restart. The newer cross-printer workflow reslices each candidate and separately approves any price change; the earlier same-profile recovery preserves its existing quote.
@@ -70,4 +89,4 @@ Repository: https://github.com/scrooksjr/Print3DFlow
 
 ## Submission preparation
 
-Add the final three-minute video URL in the submission platform. The timestamps above are recording targets; align them to the final edit before submitting. Verify that the public repository contains the demonstrated integration code and that both links open while logged out. Do not upload local credentials, private test reports, or shop profile artifacts as evidence.
+Add the final three-minute video URL in the submission platform. The timestamps above match the 175.042-second keychain final cut (displayed to the nearest preceding whole second). Verify that the public repository contains the demonstrated integration code and that both links open while logged out. Do not upload local credentials, private test reports, or shop profile artifacts as evidence.

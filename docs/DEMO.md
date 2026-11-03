@@ -1,5 +1,31 @@
 # Print3DFlow three-minute demonstration
 
+## Final recorded X2D keychain cut
+
+The final submission edit runs 2:55 (175.042 seconds), with enlarged actual app views and ElevenLabs Brian narration with corrected Baseten and Bambu pronunciations. It uses a four-color keychain, Baseten-hosted Meta Muse Spark Open, invented demo pricing and an isolated workspace. The planner reports verified blockers/missing comparison evidence; a separate dedicated X2D workflow verifies the native slice. Recovery moves to a later X2D slot with the approved quote preserved. This edit does not demonstrate four-color cross-printer comparisons or physical printing.
+
+| Final-cut time | Evidence | Focus |
+| --- | --- | --- |
+| 0:00-0:14 | Print3DFlow | From keychain request to an approved production plan |
+| 0:14-0:28 | Meta-assisted intake | Structured requirements, reviewed before job creation |
+| 0:28-0:42 | Four assigned colors | Actual geometry, embedded dimensions and filament slots |
+| 0:42-0:56 | Verified tool trail | Meta checks evidence instead of guessing |
+| 0:56-1:10 | Native X2D slicing | Purge and change overhead are counted once |
+| 1:10-1:24 | Review the candidate | Native tool allocation stays visible |
+| 1:24-1:37 | Approve the exact price | Price approval does not reserve capacity |
+| 1:37-1:48 | Approve the reservation | A separate scheduling decision |
+| 1:48-2:01 | A simulated outage | The original reservation stays until replacement approval |
+| 2:01-2:11 | Stale advice is visible | Historical evidence cannot silently become current |
+| 2:11-2:27 | Meta explains recovery | A later X2D slot, the same approved quote |
+| 2:27-2:41 | Operator-approved recovery | The audit records each commitment |
+| 2:41-2:55 | Evidence, advice, approval | Print3DFlow · built for real shop decisions |
+
+The cut shows exact-price approval, separate initial reservation approval, and separate recovery approval. The stale planner trail is historical; it is not presented as a refreshed valid recommendation. The Meta recovery adviser uses fresh verified scheduling results. Waits are omitted and the video is labelled an edited walkthrough of actual app captures. Models, private settings and raw reports remain local; no physical printer or camera commands were issued during recording.
+
+See [the submission description](SUBMISSION.md) for matching judge pointers. The single-filament three-printer sequence below is an alternative rehearsal guide, not the final video.
+
+## Alternative single-filament rehearsal
+
 Show one synthetic job with twenty copies of the owned `samples/demo-block.stl`: Meta intake, independent A1/A1 mini/X2D results, the Meta production planner and verified tool trail, explicit initial approval, stale evidence, and approval-controlled recovery after a simulated pre-start outage. Use a fresh rehearsal database, invented demo pricing and a deadline at least three days ahead.
 
 | Time | Screen action and evidence |
