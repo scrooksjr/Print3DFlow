@@ -4,6 +4,8 @@ Manufacturing workflow assistant for **Print3DStore**, built for the Meta Global
 
 Print3DFlow connects a customer request to a reviewed quote, a compatible printer reservation, and recovery when a printer becomes unavailable.
 
+**[Watch the 2:55 YouTube demo](https://youtu.be/tIm6Na5HFAg)** — Meta-assisted intake, a verified tool trail, native X2D four-color quoting, and approval-controlled outage recovery.
+
 See the [current architecture and system diagram](docs/ARCHITECTURE.md) for components, data flows, Meta integration, printer connectivity, and approval boundaries.
 
 For hands-on use, start with the [user guide](docs/USER-GUIDE.md) and [28-case test checklist](docs/TEST-GUIDE.md). They cover offline prerequisites, optional live integrations, expected results, and approval/privacy checks.

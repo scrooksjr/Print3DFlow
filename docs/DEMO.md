@@ -2,6 +2,8 @@
 
 ## Final recorded X2D keychain cut
 
+**[Watch the final demo on YouTube](https://youtu.be/tIm6Na5HFAg)** (2:55).
+
 The final submission edit runs 2:55 (175.042 seconds), with enlarged actual app views and ElevenLabs Brian narration with corrected Baseten and Bambu pronunciations. It uses a four-color keychain, Baseten-hosted Meta Muse Spark Open, invented demo pricing and an isolated workspace. The planner reports verified blockers/missing comparison evidence; a separate dedicated X2D workflow verifies the native slice. Recovery moves to a later X2D slot with the approved quote preserved. This edit does not demonstrate four-color cross-printer comparisons or physical printing.
 
 | Final-cut time | Evidence | Focus |

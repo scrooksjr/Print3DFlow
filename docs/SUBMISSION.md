@@ -2,6 +2,8 @@
 
 ## Final recorded keychain demo (2:55)
 
+**[Watch the submitted YouTube demo](https://youtu.be/tIm6Na5HFAg)**
+
 Print3DFlow helps small 3D printing shops turn a customer request into a reviewed quote, a feasible printer reservation, and an outage recovery plan. Built for the Indie track, it combines Meta assistance with deterministic manufacturing evidence and explicit operator approval.
 
 In this 2:55 demonstration, Meta Muse Spark Open, served through Baseten using meta-models/muse-spark-open-1026, extracts requirements from a keychain request. The production planner makes real read-only tool calls and displays verified blocker and comparison results instead of inventing missing evidence.
@@ -10,7 +12,7 @@ A separate native Bambu Studio workflow slices a reviewed four-color X2D project
 
 The video is an edited walkthrough of actual app captures using an isolated workspace and invented demo pricing. It demonstrates successful inference and local slicing, not a physical print or hardware calibration. The four-color demo does not claim an A1/A1 mini cross-printer comparison, a refreshed successful multicolor planner comparison, or remote print execution. Credentials, private shop rates, imported profiles, model archives, and raw private reports are not distributed.
 
-The upload package names the submission video `Print3DFlow-Hackathon-Demo.mp4` (1920 x 1080, 24 fps, H.264/AAC, 175.042 seconds). Add its hosted, judge-accessible URL to the submission form after upload. Video files remain outside Git. The earlier workflow summaries below describe separate historical tests; the final video follows the X2D keychain sequence, not the former three-printer recording plan.
+The upload package names the submission video `Print3DFlow-Hackathon-Demo.mp4` (1920 x 1080, 24 fps, H.264/AAC, 175.042 seconds). The hosted demo is available at [youtu.be/tIm6Na5HFAg](https://youtu.be/tIm6Na5HFAg). Video files remain outside Git. The earlier workflow summaries below describe separate historical tests; the final video follows the X2D keychain sequence, not the former three-printer recording plan.
 
 ## Extended feature and verification history
 
@@ -60,19 +62,19 @@ Repository: https://github.com/scrooksjr/Print3DFlow
 
 ## Stage One verification pointers
 
-- **Video 0:00-0:14:** Print3DFlow. From keychain request to an approved production plan.
-- **Video 0:14-0:28:** Meta-assisted intake. Structured requirements, reviewed before job creation.
-- **Video 0:28-0:42:** Four assigned colors. Actual geometry, embedded dimensions and filament slots.
-- **Video 0:42-0:56:** Verified tool trail. Meta checks evidence instead of guessing.
-- **Video 0:56-1:10:** Native X2D slicing. Purge and change overhead are counted once.
-- **Video 1:10-1:24:** Review the candidate. Native tool allocation stays visible.
-- **Video 1:24-1:37:** Approve the exact price. Price approval does not reserve capacity.
-- **Video 1:37-1:48:** Approve the reservation. A separate scheduling decision.
-- **Video 1:48-2:01:** A simulated outage. The original reservation stays until replacement approval.
-- **Video 2:01-2:11:** Stale advice is visible. Historical evidence cannot silently become current.
-- **Video 2:11-2:27:** Meta explains recovery. A later X2D slot, the same approved quote.
-- **Video 2:27-2:41:** Operator-approved recovery. The audit records each commitment.
-- **Video 2:41-2:55:** Evidence, advice, approval. Print3DFlow · built for real shop decisions.
+- **[Video 0:00-0:14](https://youtu.be/tIm6Na5HFAg?t=0):** Print3DFlow. From keychain request to an approved production plan.
+- **[Video 0:14-0:28](https://youtu.be/tIm6Na5HFAg?t=14):** Meta-assisted intake. Structured requirements, reviewed before job creation.
+- **[Video 0:28-0:42](https://youtu.be/tIm6Na5HFAg?t=28):** Four assigned colors. Actual geometry, embedded dimensions and filament slots.
+- **[Video 0:42-0:56](https://youtu.be/tIm6Na5HFAg?t=42):** Verified tool trail. Meta checks evidence instead of guessing.
+- **[Video 0:56-1:10](https://youtu.be/tIm6Na5HFAg?t=56):** Native X2D slicing. Purge and change overhead are counted once.
+- **[Video 1:10-1:24](https://youtu.be/tIm6Na5HFAg?t=70):** Review the candidate. Native tool allocation stays visible.
+- **[Video 1:24-1:37](https://youtu.be/tIm6Na5HFAg?t=84):** Approve the exact price. Price approval does not reserve capacity.
+- **[Video 1:37-1:48](https://youtu.be/tIm6Na5HFAg?t=97):** Approve the reservation. A separate scheduling decision.
+- **[Video 1:48-2:01](https://youtu.be/tIm6Na5HFAg?t=108):** A simulated outage. The original reservation stays until replacement approval.
+- **[Video 2:01-2:11](https://youtu.be/tIm6Na5HFAg?t=121):** Stale advice is visible. Historical evidence cannot silently become current.
+- **[Video 2:11-2:27](https://youtu.be/tIm6Na5HFAg?t=131):** Meta explains recovery. A later X2D slot, the same approved quote.
+- **[Video 2:27-2:41](https://youtu.be/tIm6Na5HFAg?t=147):** Operator-approved recovery. The audit records each commitment.
+- **[Video 2:41-2:55](https://youtu.be/tIm6Na5HFAg?t=161):** Evidence, advice, approval. Print3DFlow · built for real shop decisions.
 - **Code:** `backend/integrations.py` performs intake inference; `backend/recovery.py` performs recovery inference and grounded-response validation. Their shared provider supports the Meta Model API or Baseten; the recorded demo uses Baseten-hosted Meta Muse Spark Open. `backend/main.py` implements the API and approval transaction boundary.
 - **Production planner:** `backend/planner.py` implements the bounded Meta tool loop, allowed read-only functions, evidence validation and stale-plan checks; `frontend/src/ProductionPlanner.tsx` displays the trail and consent. The final keychain demo shows verified blockers and missing comparison evidence, then marks that advice historical after state changes. It does not show a successful four-color cross-printer plan. `backend/tests/test_planner.py` covers safeguards; the 74-check summary refers to a separate single-filament workflow.
 - **Recorded provider and native evidence:** `backend/meta_provider.py` selects the fixed Baseten hackathon model; `backend/multicolor.py` implements the dedicated native X2D four-color verification and pricing path. Price and reservation approvals remain separate.
@@ -89,4 +91,4 @@ Repository: https://github.com/scrooksjr/Print3DFlow
 
 ## Submission preparation
 
-Add the final three-minute video URL in the submission platform. The timestamps above match the 175.042-second keychain final cut (displayed to the nearest preceding whole second). Verify that the public repository contains the demonstrated integration code and that both links open while logged out. Do not upload local credentials, private test reports, or shop profile artifacts as evidence.
+Use [the final YouTube demo](https://youtu.be/tIm6Na5HFAg) as the video link in the submission platform. The timestamps above match the 175.042-second keychain final cut (displayed to the nearest preceding whole second). Verify that the public repository contains the demonstrated integration code and that both links open while logged out. Do not upload local credentials, private test reports, or shop profile artifacts as evidence.
